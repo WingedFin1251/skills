@@ -1,0 +1,20 @@
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Build
+build/
+.idea/
+oh_modules/
+*.hap
+*.hsp
+*.app
+
+# Logs
+*.log
+ohosTest/

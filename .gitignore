@@ -1,0 +1,32 @@
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+cmake-build-*/
+compile_commands.json
+
+# HarmonyOS
+oh_modules/
+*.hap
+*.hsp
+*.app
+
+# Logs
+*.log
+
+# Compiled
+*.o
+*.obj
+*.exe
+*.out
+*_sanitized
+
+# Audit reports
+unified-audit-report.json
