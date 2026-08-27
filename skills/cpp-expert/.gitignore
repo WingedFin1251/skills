@@ -1,0 +1,21 @@
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+
+# Compiled
+*.o
+*.obj
+*.exe
+*.out
+*_sanitized
+
+# Build
+compile_commands.json
+build/
+cmake-build-*/
+unified-audit-report.json
