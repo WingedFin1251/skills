@@ -1,8 +1,8 @@
 # arkts-expert
 
-**ArkTS/HarmonyOS 代码审查技能：8 维度优先级规则 + Android 迁移映射 + 严格语法检测。覆盖状态管理（V1/V2）、UI 组件、导航路由、性能优化、生命周期管理。**
+**ArkTS/HarmonyOS 代码审查技能：10 维度优先级规则 + Android 迁移映射 + 严格语法检测。覆盖状态管理（V1/V2）、UI 组件、导航路由、性能优化、生命周期管理、服务层一致性、平台运行时安全。**
 
-**Deterministic ArkTS/HarmonyOS code review: 8 priority-ranked rule dimensions + Android migration mapping + strict syntax detection. Covers state management (V1/V2), UI components, navigation, performance, and lifecycle management.**
+**Deterministic ArkTS/HarmonyOS code review: 10 priority-ranked rule dimensions + Android migration mapping + strict syntax detection. Covers state management (V1/V2), UI components, navigation, performance, lifecycle, service-layer consistency, and platform runtime safety.**
 
 > 灵感来自 [cpp-expert](https://skills.sh/)。不同于纯知识注入型技能，arkts-expert 专注于 ArkTS 的严格语法约束和 Android → HarmonyOS 迁移陷阱——这些是开发者从 Android 迁移到 HarmonyOS 时最常遇到的三类错误。
 >
@@ -57,8 +57,8 @@ Run the lint script on this file
 arkts-expert/
 ├── SKILL.md                    # 入口：触发条件 + Rule 0 + 9 步工作流
 │                               # Entry: triggers + Rule 0 + 9-step workflow
-├── AGENTS.md                   # 完整规则参考：8 维度 × ❌/✅ 示例
-│                               # Full rule reference: 8 dimensions × ❌/✅ examples
+├── AGENTS.md                   # 完整规则参考：10 维度 × ❌/✅ 示例
+│                               # Full rule reference: 10 dimensions × ❌/✅ examples
 ├── references/
 │   ├── state-management.md     # V1/V2 装饰器深度参考
 │   │                           # V1/V2 decorator deep reference
@@ -68,8 +68,10 @@ arkts-expert/
 │   │                           # Navigation/Router migration guide
 │   ├── performance.md          # 性能优化模式
 │   │                           # Optimization patterns
-│   └── android-migration.md    # Android ↔ HarmonyOS 概念映射表
-│                               # Android ↔ HarmonyOS concept mapping
+│   ├── android-migration.md    # Android ↔ HarmonyOS 概念映射表
+│   │                           # Android ↔ HarmonyOS concept mapping
+│   └── service-layer.md        # 服务层/结构性问题审查流（非 UI 类）
+│                               # Service-layer / structural audit flow
 └── scripts/
     ├── arkts-lint.sh           # ArkTS 静态分析包装器 (Bash)
     │                           # ArkTS static analysis wrapper (Bash)
@@ -81,7 +83,7 @@ arkts-expert/
 
 ## 规则体系 / Rule System
 
-8 个检查维度按优先级排列 / Eight review dimensions ordered by priority:
+10 个检查维度按优先级排列 / Ten review dimensions ordered by priority:
 
 | 优先级 / Priority | 维度 / Dimension | 关键检查项 / Key Checks |
 | :---------------- | :--------------- | :---------------------- |
@@ -92,6 +94,8 @@ arkts-expert/
 | 🟠 **HIGH** | 性能优化 / Performance | LazyForEach/Repeat、@Track（V1 属性级更新）/@Trace（V2 属性级观测）、不可变状态（V1 语义） / LazyForEach/Repeat, @Track (V1 property-level update) / @Trace (V2 property-level observation), immutable state (V1 semantics) |
 | 🟠 **HIGH** | 副作用 / Side Effects | 定时器清理、内存泄漏、aboutToAppear/Disappear / Timer cleanup, memory leaks, lifecycle |
 | 🟠 **HIGH** | Android 迁移 / Android Migration | 概念映射、API 翻译、原生模块链 / Concept mapping, API translation, native module chain |
+| 🟠 **HIGH** | 服务层一致性 / Service-Layer Consistency | 关注点矩阵（鉴权/限流/超时/重试/资源释放）、上游契约核对、PATCH 覆盖 / Cross-method matrix, upstream contract, verb coverage |
+| 🟠 **HIGH** | 平台运行时与结构安全 / Platform Runtime & Structural Safety | BusinessError 错误码、资源释放（destroy）、@Sendable、模块依赖方向、平台概念泄漏验证门 / BusinessError code, destroy, @Sendable, dependency direction, platform-leak check |
 | 🟡 **MEDIUM** | 代码风格 / Code Style | 命名规范、项目结构、注释 / Naming conventions, project structure, comments |
 
 ### Rule 0：版本检测（元规则） / Rule 0: Version Detection (Meta-Rule)
@@ -103,7 +107,9 @@ Automatically identifies target API version (API 9 / 10-11 / 12+) and adjusts st
 
 ## 工作流程 / Workflow
 
-当技能触发时，AI 依次执行 9 步工作流 / When the skill triggers, the AI executes a 9-step workflow:
+当技能触发时，AI 依次执行 9 步工作流；**Stage 2 按文件角色分叉**：被审对象为封装类/服务类/Worker 类时，导航/性能/迁移检查（Step 5-8）替换为服务层审查流（维度 9/10，见 references/service-layer.md）。
+
+When the skill triggers, the AI executes a 9-step workflow; **Stage 2 branches by file role**: for wrapper/service/Worker classes, checks 5-8 are replaced by the Service-Layer Audit flow (dimensions 9-10, see references/service-layer.md).
 
 ```
 ╔═══════════════════════════════════════════╗
@@ -178,6 +184,10 @@ Automatically detects: any/unknown usage, non-Error throws, bare new Promise() (
 - 概念映射表（如适用）
 - Concept mapping table (if applicable)
 
+## Service-Layer / Structural Notes（封装类/服务类/Worker 才输出）
+- 关注点矩阵结论、异常可达性（死分支）、平台能力验证门结论
+- Cross-method matrix, exception reachability, platform-capability checks
+
 ## Issue Count + Recommendation
 ```
 
@@ -194,6 +204,7 @@ Automatically detects: any/unknown usage, non-Error throws, bare new Promise() (
 ---
 
 ### 版本历史 / Version History
+- **v2.0** — 维度升级：8 → 10（新增服务层一致性、平台运行时与结构安全）；Stage 2 角色分叉审查流；新增 references/service-layer.md；Two-Stage 流程 v2.0 / Dimension upgrade 8 → 10 (service-layer consistency, platform runtime & structural safety); Stage 2 role-based branching; new references/service-layer.md
 - **v1.0** — 初始版本：8 维度规则体系、5 参考文件、2 工具脚本、Android 迁移映射 / Initial release: 8-dimension rule system, 5 reference files, 2 tool scripts, Android migration mapping
 
 ---

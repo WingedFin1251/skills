@@ -1,5 +1,14 @@
 # arkts-expert 变更日志
 
+## [2.0.0] — 2026-08-28
+
+### 新增（维度升级 8 → 10）
+- **新增 references/service-layer.md**：服务层/结构性问题审查流——文件角色判定（UI/服务/工具/Worker）+ 5 大参照系（兄弟方法横向矩阵、平台运行时清单、上游契约、模块依赖方向、V1/V2 混用）+ 8 步执行流程 + 反模式清单 + 验证门 + 结论校准
+- **AGENTS.md 新增两章**：§9 服务层一致性（关注点矩阵、上游契约核对、PATCH 覆盖）；§10 平台运行时与结构安全（BusinessError 错误码、资源释放 destroy、平台能力验证门、@Sendable、模块依赖方向、@Reusable/@ComponentV2 选型）
+- **SKILL.md 升级 v2.0**：Two-Stage Deep Review / Attention Budget / Skipped File Rules 版本号 v1.0→v2.0；Stage 2 增加**按文件角色分叉**（UI 组件走默认检查 5-8；封装类/服务类切换服务层审查流；Worker/@Sendable 走并发清单）；Quick Reference、When to Apply、Bundled Resources、报告模板同步（报告新增第 7 节 Service-Layer Notes）
+- **README.md**：维度清单/结构树/规则表/版本历史同步 10 维度 + service-layer.md
+- 新增内容全部对照 HarmonyOS 官方文档（API 26 快照）核验，修正了原参考方法论中的 4 处被证伪断言（单例模式、spread/utility types 支持范围、@Reusable 与 @ComponentV2 兼容性、hvigor analyze 语义）
+
 ## [1.0.1] — 2026-08-28
 
 ### 修复（对照 HarmonyOS 官方文档 API 26 快照逐条核验）

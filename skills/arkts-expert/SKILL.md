@@ -27,6 +27,8 @@ Use this skill when:
 - Detecting memory leaks, unnecessary re-renders, or state duplication
 - Optimizing app startup time and bundle size
 - Reviewing project structure, module organization, and API usage
+- Auditing service-layer / wrapper classes (HttpClient, Repository, storage) for cross-method consistency and upstream API contract compliance
+- Reviewing Worker/@Sendable concurrency code and module dependency direction (HAP/HSP/HAR)
 
 **Explicit triggers:** ArkTS, HarmonyOS, ArkUI, @State, @Prop, @Link,
 @Observed, @ObjectLink, @Provide, @Consume, @Watch, @Trace, @Builder,
@@ -55,7 +57,7 @@ Before any review, determine the target HarmonyOS API version:
 
 ## Development Process
 
-### Two-Stage Deep Review (v1.0 — MANDATORY)
+### Two-Stage Deep Review (v2.0 — MANDATORY)
 Execute **Stage 1 → Stage 2** in order. Stage 1 consumes 70% of your attention
 budget on single-file, single-function logic. Stage 2 consumes 30% on
 cross-file architecture and migration patterns.
@@ -86,7 +88,7 @@ Check every `@Component` for decorator correctness. See AGENTS.md §2.
 
 ### 4. **UI Component Scan** (🔴 CRITICAL)
 Check `build()` functions for anti-patterns. See AGENTS.md §3.
-- Anonymous functions in `build()` → 🟠 HIGH
+- Anonymous functions in `build()`（非响应式迭代/重活）→ 🟠 HIGH
 - Missing `@Builder` for repeated UI → 🟡 MEDIUM
 - Lifecycle cleanup (timers, subscriptions) → 🟠 HIGH
 
@@ -95,6 +97,11 @@ Check `build()` functions for anti-patterns. See AGENTS.md §3.
 ### STAGE 2: Macro Architecture Verdict (30% AI budget)
 
 **Do NOT re-read single-function logic. Think cross-file and cross-component.**
+
+**Role-based branching (v2.0):** Before applying Stage 2 checks, classify the target file:
+- **UI component** (@Component/@Entry) → apply checks 5–8 below
+- **Service/wrapper/utils class** (≥2 similar methods; HttpClient/Repository/Storage…) → run the **Service-Layer Audit flow** (dimensions 9–10; AGENTS.md §9/§10 + references/service-layer.md) instead of checks 5–8
+- **Worker/@Sendable concurrency code** → dimension 10 concurrency checklist
 
 ### 5. **Navigation & Routing Review** (🟠 HIGH)
 Check router usage vs Navigation component. See AGENTS.md §4.
@@ -120,7 +127,7 @@ Check naming and project structure. See AGENTS.md §8.
 
 ---
 
-## Attention Budget Guide (v1.0 — MANDATORY)
+## Attention Budget Guide (v2.0 — MANDATORY)
 
 This section defines how to allocate your limited context attention.
 
@@ -139,7 +146,7 @@ This section defines how to allocate your limited context attention.
 - Output: "⚠️ API version undetected. Applying all V1+V2 rules. Manual verification of target API version recommended."
 - Apply the broadest rule set when uncertain.
 
-**Skipped File Rules (v1.0 — MANDATORY):**
+**Skipped File Rules (v2.0 — MANDATORY):**
 - **Skipped != Passed**: If a file was not scanned due to size or context limits,
   you MUST NOT conclude the code is safe in that file. You had a blind spot.
 - **Contextual Awareness**:
@@ -150,23 +157,26 @@ This section defines how to allocate your limited context attention.
 
 | Stage | Priority | Dimension | Key Checks |
 |-------|----------|-----------|------------|
-| **1** | ⚙️ MANDATORY | Version Detection | API 9/10/12+, build-profile.json5 |
+| **1** | ⚙️ MANDATORY | Version Detection | API 9 / 10-11 / 12+, build-profile.json5 |
 | **1** | 🔴 CRITICAL | ArkTS Syntax | any/unknown, limited-throw, generics, return types |
 | **1** | 🔴 CRITICAL | State Management | @State/@Prop/@Link correctness, duplication |
 | **1** | 🔴 CRITICAL | UI Components | Lifecycle, @Builder, re-render optimization |
 | **2** | 🟠 HIGH | Navigation | Router vs Navigation, deep links |
 | **2** | 🟠 HIGH | Performance | LazyForEach, @Trace, immutable state |
 | **2** | 🟠 HIGH | Android Migration | Concept mapping, native module chain |
+| **2** | 🟠 HIGH | Service Layer | Cross-method matrix, upstream contract (AGENTS.md §9) |
+| **2** | 🟠 HIGH | Platform Runtime | BusinessError code, destroy, @Sendable, dependency direction (AGENTS.md §10) |
 | **2** | 🟡 MEDIUM | Code Style | Naming, project structure |
 
 ## Bundled Resources
 
-- **AGENTS.md** — Full 8-dimension rule reference with ❌/✅ examples (REQUIRED reading)
+- **AGENTS.md** — Full 10-dimension rule reference with ❌/✅ examples (REQUIRED reading)
 - **references/state-management.md** — V1/V2 state decorator guide; load when state issues found
 - **references/ui-components.md** — Common component patterns and anti-patterns; load for UI issues
 - **references/navigation.md** — Navigation/Router guide with migration; load for routing issues
 - **references/performance.md** — Optimization patterns and profiling; load for performance issues
 - **references/android-migration.md** — Android ↔ HarmonyOS mapping; load for migration issues
+- **references/service-layer.md** — Service-layer / structural audit flow (cross-method matrix, platform-runtime checklist); load for non-UI classes (wrapper/service/Worker)
 - **scripts/arkts-lint.sh** — ArkTS static analysis wrapper (Bash)
 - **scripts/arkts-lint.ps1** — ArkTS static analysis wrapper (PowerShell)
 
@@ -175,9 +185,9 @@ This section defines how to allocate your limited context attention.
 Reports MUST start with a project detection block:
 
 ### 1. 🔍 Project Detection (MUST INCLUDE AT TOP)
-- **Detected API Version**: [API 9 / API 10 / API 12+ / Unknown]
+- **Detected API Version**: [API 9 / API 10-11 / API 12+ / Unknown]
 - **State Management**: [V1 only / V1+V2 / V2 recommended]
-- **Navigation**: [router (deprecated) / Navigation]
+- **Navigation**: [router (not recommended) / Navigation]
 - **Scope Notes**:
   - List any files skipped due to context limits.
   - Example: "⚠️ 3 ETS files skipped due to context window. Manual review recommended."
@@ -188,5 +198,8 @@ Reports MUST start with a project detection block:
 ### 4. High Priority 🟠
 ### 5. Medium Priority 🟡
 ### 6. Android Migration Notes (if applicable)
+### 7. Service-Layer / Structural Notes (if applicable — 封装类/服务类/Worker 才输出)
+   - 关注点矩阵结论（哪列勾选不齐）、异常可达性（死分支）、平台能力验证门结论
+   - 输入不足（缺契约/平台知识）→ 标注"无法评估"
 
 See AGENTS.md for the full report template.

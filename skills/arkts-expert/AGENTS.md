@@ -20,15 +20,19 @@
 6. [Side Effects & Lifecycle](#6-side-effects--lifecycle)
 7. [Android → HarmonyOS Migration](#7-android--harmonyos-migration)
 
+### Architecture & Cross-Cutting — **HIGH**
+9. [Service-Layer Consistency](#9-service-layer-consistency)
+10. [Platform Runtime & Structural Safety](#10-platform-runtime--structural-safety)
+
 ### Style — **MEDIUM**
 8. [Code Style & Organization](#8-code-style--organization)
 
 ### Review Process — **MANDATORY**
-9. [Attention Budget Guide](#attention-budget-guide--mandatory)
+11. [Attention Budget Guide](#attention-budget-guide--mandatory)
 
 ---
 
-## Attention Budget Guide (v1.0 — MANDATORY)
+## Attention Budget Guide (v2.0 — MANDATORY)
 
 This section defines how to allocate your limited context attention.
 
@@ -47,7 +51,7 @@ This section defines how to allocate your limited context attention.
 - Output: "⚠️ API version undetected. Applying all V1+V2 rules. Manual verification of target API version recommended."
 - Apply the broadest rule set when uncertain.
 
-**Skipped File Rules (v1.0 — MANDATORY):**
+**Skipped File Rules (v2.0 — MANDATORY):**
 - **Skipped != Passed**: If a file was not scanned due to size or context limits,
   you MUST NOT conclude the code is safe in that file. You had a blind spot.
 - **Contextual Awareness**:
@@ -1077,6 +1081,54 @@ entry/src/main/
 
 ---
 
+## 9. Service-Layer Consistency（服务层一致性）
+
+**Impact: HIGH | Category: service-layer | Tags:** cross-method, contract, 关注点矩阵
+
+**触发**：封装类/服务类/工具类（非 UI 组件）+ ≥2 个职责相近方法（HttpClient、Repository、Storage 等）。
+**前提**：语法级检查已通过——本维度只做第二遍，不做 any/unknown 等第一遍工作。
+**依赖输入**：平台运行时知识、上游 API 契约、该类全部方法完整代码（缺则降级为"无法评估"，禁止只审单个方法）。
+详细流程见 `references/service-layer.md`。
+
+### 9.1 关注点矩阵（横向对比 v2.0）
+表头 = 横切关注点：鉴权/限流/错误分类/超时/重试/资源释放/状态码判定/body 解析；行 = 同类方法（get/post/put/delete…），逐格打勾：
+
+- 同一关注点在**部分方法覆盖、其余缺失** → 🟠 HIGH
+- 兄弟方法间**行为不一致**（兜底文案、超时值、错误码映射差异）→ 🟠 HIGH（行为分叉比重复更严重）
+- 平台落点：API 12+ 网络库提供官方拦截器链（interceptor），鉴权/日志/错误分类等横切关注点应**下沉拦截器**而非逐方法重复
+
+### 9.2 上游契约核对（参照系③）
+- 写请求**禁止只断言单一成功状态码**：对照 API 文档列出全部成功码（如 200/201/204）
+- 枚举动词覆盖率（编辑类接口尤其要查 **PATCH**）
+- 硬编码假设（状态码/Header/限流范围）逐条列成表核对；**以文档为准**
+- 无契约文档 → 标注"无法评估"，不得臆断
+
+## 10. Platform Runtime & Structural Safety（平台运行时与结构安全）
+
+**Impact: HIGH | Category: platform-runtime | Tags:** busineserror, sendable, destroy, 依赖方向
+
+### 10.1 异常路径真值表（参照系②）
+- catch 内 e 用 `(e as BusinessError).code` 对照模块错误码表（http 为 2300000+curl 体系：2300028 超时/2300007 连接失败/2300094 认证错误）；`instanceof` 缩窄**不是**官方形态（官方全库示例统一 `as BusinessError`）
+- `arkts-limited-throw` 保证 catch 中 e 必为 Error 子类 → "非 Error 兜底分支"恒不可达 = 死代码（如 `if (e instanceof Error) throw e; throw new Error(...)` 后半段）
+- 检查 catch 内 rethrow 是否把原始异常透传给用户
+
+### 10.2 资源释放
+- 每个资源型 API（createHttp/文件/套接字）必须有 `finally + destroy()/close()`（官方强制，`@ohos.net.http`："务必调用 destroy 方法释放资源，避免出现内存泄漏"）
+
+### 10.3 平台能力验证门（防误报）
+- **无连接池/无内建重试 API**：连接池、单例连接、自动重试建议 = 平台概念泄漏 → 禁止建议
+- 单例写法**合法**（官方标准：private constructor + static getInstance，官方示例 8+ 处）；要审的是生命周期与线程安全
+- 对象 spread 不支持、Pick/Omit 不可用（Partial/Required/Readonly/Record 可用）
+
+### 10.4 并发与共享状态
+- `@Sendable` 类成员变量必须属于 Sendable 支持类型；@Sendable 类只能继承 @Sendable；Worker 传参追踪类型链
+- `@Reusable`(V1) 与 `@ComponentV2` 混用**渲染异常**（官方反例）；V2 复用用 `@ReusableV2`（API 18+）
+
+### 10.5 模块依赖方向（参照系④）
+- `entry → feature(HAP/HSP) → common(HAR)` 单向；**common 绝不能依赖 feature**
+- 传输层不得 import 业务服务（循环依赖风险）
+- `hvigor --analyze` 现行语义为构建耗时分析；模块依赖用 DevEco Studio 依赖视图核对
+
 ## Code Review Report Format
 
 ```markdown
@@ -1122,6 +1174,7 @@ entry/src/main/
 |-------|-------------|----------|--------|
 | **CRITICAL** | Syntax violation, state bug | any/unknown, missing @State, wrong decorator | Fix immediately |
 | **HIGH** | Performance, memory leak | Missing LazyForEach, timer leak, not-recommended router | Fix before merge |
+| **HIGH** | Service-layer inconsistency, platform leakage | Missing cross-method concern, dead catch branch, connection-pool suggestion | Fix before merge |
 | **MEDIUM** | Style, naming | Missing explicit return type (style), inconsistent naming | Fix or accept |
 
 ### References
