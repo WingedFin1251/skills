@@ -62,22 +62,23 @@ This section defines how to allocate your limited context attention.
 
 Before applying any rules, determine the target API version from `build-profile.json5` or `module.json5`:
 
-| Heuristic | API 9 | API 10+ | API 12+ |
-|-----------|-------|---------|---------|
-| Core | ArkTS V1 | ArkTS V1 + V2 preview | ArkTS V2 stable |
-| State Mgmt | @State/@Prop/@Link | V1 + @ObservedV2/@Trace | V2 full |
-| Navigation | router (deprecated) | Navigation component | Navigation + NavDestination |
-| Component | struct components | struct + custom | Custom Component Model |
+| Heuristic | API 9 | API 10-11 | API 12+ |
+|-----------|-------|-----------|---------|
+| Core | ArkTS V1 only | ArkTS V1 only — V2 does NOT exist below API 12 (V1 于 API 7 推出、V2 于 API 12 推出) | V1 + V2 (official guidance: prefer V2 for new code) |
+| State Mgmt | @State/@Prop/@Link/@Observed/@ObjectLink/@Provide/@Consume/@Watch | Same as API 9 — @ObservedV2/@Trace/@Local etc. are API 12+ | @ComponentV2/@Local/@Param/@Once/@Event/@Monitor/@ObservedV2/@Trace/@Computed |
+| Navigation | Navigation (API 8+) + NavRouter; router = "not recommended" | Navigation + NavPathStack (preferred); avoid router | Navigation + NavPathStack + NavDestination |
+| Component | @Component + struct | @Component + struct | @ComponentV2 + struct (or @Component) |
+| Module | Stage model + module.json5 (standard since API 9) | Stage model + module.json5 | Stage model + module.json5 |
 
-**If API 9:** Apply V1 state management only. Flag deprecated router usage.
-**If API 10+:** Prefer Navigation over router. Use V1 state management.
+**If API 9-11:** Apply V1 state management only. V2 decorators must NOT be used (API 12+ only).
+**All versions:** Prefer Navigation over router. Router is "not recommended" in official docs (no version-based deprecation).
 **If API 12+:** Recommend V2 state management for new code. Migration guide for V1.
 
 ---
 
 ## 1. ArkTS Syntax Rules
 
-**Impact: CRITICAL | Category: arkts-syntax | Tags:** no-any-unknown, limited-throw, inferred-generics, implicit-return-types
+**Impact: CRITICAL | Category: arkts-syntax | Tags:** no-any-unknown, limited-throw, inferred-generics, explicit-return-types
 
 ### Why This Matters
 ArkTS is a strict subset of TypeScript optimized for AOT compilation. These rules exist because the compiler cannot optimize `any`/`unknown` types, non-Error throws break stack unwinding, and missing type parameters force runtime inference.
@@ -152,67 +153,86 @@ function validate(input: string) {
 }
 ```
 
-### 1.3 arkts-no-inferred-generic-params
+### 1.3 arkts-no-inferred-generic-params（错误码 10605034）
 
-ArkTS要求泛型调用显式指定类型参数。不能依赖类型推断。
+**可以从参数推断类型实参时，省略类型实参是合法用法；仅当无法从参数推断、或禁止仅依据返回类型推断时才报错。**
 
 #### ❌ Incorrect
 
 ```typescript
-function createPromise(): Promise {  // ERROR: missing type parameter
-  return new Promise((resolve) => {
-    resolve("done");
-  });
+// 假定存在泛型函数 choose<T>(x: T, y: T): T
+function greet<T>(): T {     // ERROR: T 无法从参数推断
+  return 'Hello' as T;
 }
 
-const result = Promise.resolve(42);  // ERROR: inferred generic param
+const z = greet();           // ERROR: 禁止仅基于返回类型推断泛型参数，须写 greet<string>()
+const y = choose('10', 20);  // ERROR: 参数类型不一致，无法推断出一致的类型实参
 ```
 
 #### ✅ Correct
 
 ```typescript
-function createPromise(): Promise<string> {
-  return new Promise<string>((resolve) => {
-    resolve("done");
-  });
+function choose<T>(x: T, y: T): T {
+  return Math.random() < 0.5 ? x : y;
 }
 
-const result = Promise.resolve<number>(42);
+const x = choose(10, 20);   // OK: 可从参数推断 choose<number>，省略类型实参合法
+const z = greet<string>();  // OK: 显式标注类型实参
 ```
 
-### 1.4 arkts-no-implicit-return-types
+### 1.4 Explicit Return Types (Style — not a compile rule)
 
-ArkTS要求所有函数显式标注返回类型。不能依赖类型推断。
+ArkTS 没有名为 `arkts-no-implicit-return-types` 的编译规则（该规则名不存在）。ArkTS 强制的是**严格类型检查**（错误码 10605999：noImplicitReturns / strictNullChecks / strictFunctionTypes / strictPropertyInitialization）。显式标注返回类型属于官方编码风格与 Code Linter 建议（warn 级），审查时应按 🟡 MEDIUM 风格项标注，**不要**标记为编译错误（🔴）。
 
-#### ❌ Incorrect
+#### ❌ Incorrect (real compile errors)
 
 ```typescript
-function calculate(a: number, b: number) {  // ERROR: missing return type
-  return a + b;
+function fetchData(s: string): string {  // ERROR: noImplicitReturns
+  if (s !== "") {
+    return s.toUpperCase();
+  }
+  // 缺少 return —— 并非所有代码路径都有返回值
 }
 
-function fetchData() {  // ERROR: missing return type
-  return fetch("/api/data");
-}
+let n: number = null;  // ERROR: strictNullChecks
 ```
 
 #### ✅ Correct
 
 ```typescript
-function calculate(a: number, b: number): number {
-  return a + b;
-}
-
-function fetchData(): Promise<Response> {
-  return fetch("/api/data");
+function fetchData(s: string): string {
+  if (s !== "") {
+    return s.toUpperCase();
+  }
+  return "";
 }
 ```
 
-### 1.5 arkts-no-untyped-obj-literals
+### 1.5 arkts-no-untyped-obj-literals（错误码 10605038）
 
-ArkTS禁止未类型化的对象字面量直接作为参数传递。
+**上下文类型明确时，对象字面量可以直接作为参数传递——编译器可根据上下文推断字面量类型，属于合法用法**（官方示例：`getPoint({x: 5, y: 10})` 合法）。该规则仅在以下上下文报错：
+- 初始化 any / Object / object 类型目标
+- 初始化带方法的类或接口
+- 初始化含自定义带参构造函数的类
+- 初始化带 readonly 字段的类
 
-#### ❌ Incorrect
+#### ❌ Incorrect (real compile errors)
+
+```typescript
+interface Config {
+  url: string;
+  timeout: number;
+  init(): void;   // 带方法的接口 → 字面量无法初始化
+}
+
+// ERROR: Object 类型目标不允许字面量初始化
+let o: Object = { url: "https://example.com" };
+
+// ERROR: 带方法的接口不能用字面量初始化
+const cfg: Config = { url: "https://example.com", timeout: 5000 };
+```
+
+#### ✅ Correct
 
 ```typescript
 interface Config {
@@ -222,13 +242,10 @@ interface Config {
 
 function fetchWithConfig(config: Config) { /* ... */ }
 
-// ERROR: Object literal with no type annotation
+// OK: 上下文类型明确（参数类型为 Config），字面量类型由上下文推断——直接传参合法
 fetchWithConfig({ url: "https://example.com", timeout: 5000 });
-```
 
-#### ✅ Correct
-
-```typescript
+// 独立声明的字面量需显式标注类型（或先用变量声明）
 const config: Config = {
   url: "https://example.com",
   timeout: 5000
@@ -372,13 +389,32 @@ struct ParentPage {
 
 ### 2.2 @Observed/@ObjectLink — Nested object reactivity
 
+`@ObjectLink` 能观察 `@Observed` 类实例的**第一层**属性变化；**深层嵌套**（第二层及更深）的属性修改无法被观察到，需要整体替换第一层属性（或在 API 12+ 改用 V2 的 @ObservedV2/@Trace 实现属性级深度观测）。
+
 #### ❌ Incorrect
 
 ```typescript
 @Observed
+class Address {
+  city: string = "";
+}
+
+@Observed
 class UserProfile {
   name: string = "";
-  avatar: string = "";
+  address: Address = new Address();
+}
+
+@Entry
+@Component
+struct ParentPage {
+  @State profile: UserProfile = new UserProfile();
+
+  build() {
+    Column() {
+      ProfileCard({ profile: this.profile })
+    }
+  }
 }
 
 @Component
@@ -387,7 +423,8 @@ struct ProfileCard {
 
   build() {
     Column() {
-      Text(this.profile.name)  // Won't update if only profile.name changes
+      Text(this.profile.name)          // 会更新：第一层属性
+      Text(this.profile.address.city)  // 不会更新：第二层属性，@ObjectLink 观察不到
     }
   }
 }
@@ -396,22 +433,11 @@ struct ProfileCard {
 #### ✅ Correct
 
 ```typescript
-@Observed
-class UserProfile {
-  name: string = "";
-  avatar: string = "";
-}
-
-@Component
-struct ProfileCard {
-  @ObjectLink profile: UserProfile;
-
-  build() {
-    Column() {
-      Text(this.profile.name)  // Updates when profile.name changes
-    }
-  }
-}
+// 深层修改 → 整体替换第一层属性（address 是第一层属性，重新赋值可被观察到）
+this.profile.address = new Address();   // 触发刷新
+// 修改第一层简单属性同样触发刷新
+this.profile.name = "New Name";         // 触发刷新
+// V2（API 12+）替代方案：@ObservedV2 + @Trace 支持任意深度的属性级观测
 ```
 
 ### 2.3 V2 Decorators (API 12+)
@@ -544,9 +570,10 @@ struct MyPage {
 
   build() {
     Column() {
-      // Anonymous function in build — causes full re-render
+      // 非响应式：this.items.forEach 不参与状态跟踪，items 变化不会触发 UI 刷新；
+      // 且无键值生成器，列表无法做最小化复用更新
       this.items.forEach((item: string) => {
-        Text(item)  // No key — list optimization disabled
+        Text(item)
       })
     }
   }
@@ -562,16 +589,19 @@ struct MyPage {
   @State items: string[] = [];
 
   @Builder
-  ItemBuilder(item: string, index: number) {
+  ItemBuilder(item: string) {
     Text(item)
-      .key(`item-${index}`)
   }
 
   build() {
     Column() {
-      ForEach(this.items, (item: string, index: number) => {
-        this.ItemBuilder(item, index)
-      })
+      // ForEach 键值由第三个参数 keyGenerator 生成（唯一、与数据相关）；
+      // 官方不建议使用 index 作为键值
+      ForEach(this.items,
+        (item: string) => {
+          this.ItemBuilder(item)
+        },
+        (item: string) => item)
     }
   }
 }
@@ -579,11 +609,12 @@ struct MyPage {
 
 ### 3.3 Re-render Optimization
 
+V1 中 @State 变化会触发所在组件 `build()` 重新执行（框架按最小粒度更新 UI 节点）。把互不相关的状态拆到子组件，可缩小 build 重执行的范围（官方最佳实践：合理划分状态、减少不必要的刷新范围）。
+
 #### ❌ Incorrect
 
 ```typescript
 @Entry
-@Component
 @Component
 struct MyPage {
   @State count: number = 0;
@@ -591,7 +622,7 @@ struct MyPage {
 
   build() {
     Column() {
-      Text(this.label)  // Re-renders when count changes (unnecessary)
+      Text(this.label)           // 与 count 无关，但 count 变化会重执行本组件 build()
       Button(`${this.count}`)
         .onClick(() => { this.count++; })
     }
@@ -602,6 +633,7 @@ struct MyPage {
 #### ✅ Correct
 
 ```typescript
+// label 拆到子组件：count 变化时 LabelText 的 @Prop 未变，不随父组件重新渲染
 @Entry
 @Component
 struct MyPage {
@@ -610,10 +642,19 @@ struct MyPage {
 
   build() {
     Column() {
-      Text(this.label)  // Only re-renders when label changes
+      LabelText({ label: this.label })
       Button(`${this.count}`)
         .onClick(() => { this.count++; })
     }
+  }
+}
+
+@Component
+struct LabelText {
+  @Prop label: string = "";
+
+  build() {
+    Text(this.label)
   }
 }
 ```
@@ -625,9 +666,9 @@ struct MyPage {
 **Impact: HIGH | Category: navigation | Tags:** router, navigation, deep-links, page-stack
 
 ### Why This Matters
-Router is deprecated since API 9. Using Navigation component ensures forward compatibility and provides better page stack management.
+Router is "not recommended" in official docs (no version-based deprecation). Using the Navigation component (available since API 8) is the recommended routing framework and provides better page stack management.
 
-### 4.1 Router (Deprecated) → Navigation Migration
+### 4.1 Router (不推荐) → Navigation Migration
 
 #### ❌ Incorrect
 
@@ -641,7 +682,7 @@ struct MyPage {
     Column() {
       Button("Go to Detail")
         .onClick(() => {
-          router.pushUrl({ url: "pages/DetailPage" });  // Deprecated
+          router.pushUrl({ url: "pages/DetailPage" });  // 不推荐：官方建议使用 Navigation
         })
     }
   }
@@ -651,41 +692,70 @@ struct MyPage {
 #### ✅ Correct
 
 ```typescript
-import { Navigation } from "@ohos.arkui";
-
+// Navigation 是 ArkUI 内置组件，无需 import（不存在 import { Navigation } from "@ohos.arkui"）；
+// API 10+ 使用 NavPathStack 管理页面栈，页面由 NavDestination 承载；
+// API 9 需配合 NavRouter 组件实现页面路由。
 @Entry
 @Component
 struct MyPage {
+  pathStack: NavPathStack = new NavPathStack();
+
+  @Builder
+  PageMap(name: string) {
+    if (name === "DetailPage") {
+      DetailPage()
+    }
+  }
+
   build() {
-    Navigation() {
+    Navigation(this.pathStack) {
       Column() {
         Button("Go to Detail")
           .onClick(() => {
-            // Navigation-based routing
+            this.pathStack.pushPathByName("DetailPage", { id: 1 });
           })
       }
     }
     .title("My App")
+    .navDestination(this.PageMap)
+  }
+}
+
+@Component
+struct DetailPage {
+  build() {
+    NavDestination() {
+      Text("Detail")
+    }
+    .title("Detail")
   }
 }
 ```
 
 ### 4.2 Deep Link Configuration
 
-In `module.json5`:
+URI 深链在 `module.json5` 的 **abilities[].skills[].uris** 数组中配置（官方示例；字段：scheme/host/port/path，其中 path 与 pathStartWith/pathRegex 三选一）：
 
 ```json
 {
   "module": {
-    "uriOtions": {
-      "domains": [
-        {
-          "scheme": "myapp",
-          "host": "detail",
-          "path": "/page"
-        }
-      ]
-    }
+    "abilities": [
+      {
+        "skills": [
+          {
+            "actions": ["ohos.want.action.home"],
+            "entities": ["entity.system.home"],
+            "uris": [
+              {
+                "scheme": "myapp",
+                "host": "detail",
+                "path": "/page"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -725,45 +795,89 @@ struct MyPage {
 #### ✅ Correct
 
 ```typescript
+// LazyForEach 第一个参数必须是实现 IDataSource 接口的数据源实例（不能直接传普通数组）；
+// 键值通过第三个参数 keyGenerator 生成（唯一、与数据相关，不要用 index）
+class ItemDataSource implements IDataSource {
+  private listeners: DataChangeListener[] = [];
+  private dataArray: string[] = [];
+
+  totalCount(): number {
+    return this.dataArray.length;
+  }
+
+  getData(index: number): string {
+    return this.dataArray[index];
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) {
+      this.listeners.push(listener);
+    }
+  }
+
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const pos = this.listeners.indexOf(listener);
+    if (pos >= 0) {
+      this.listeners.splice(pos, 1);
+    }
+  }
+
+  pushData(data: string): void {
+    this.dataArray.push(data);
+    this.listeners.forEach((listener: DataChangeListener) => {
+      listener.onDataAdd(this.dataArray.length - 1);
+    });
+  }
+}
+
 @Entry
 @Component
 struct MyPage {
-  @State items: string[] = Array.from({ length: 1000 }, (_, i) => `Item ${i}`);
+  private data: ItemDataSource = new ItemDataSource();
+
+  aboutToAppear() {
+    for (let i = 0; i <= 999; i++) {
+      this.data.pushData(`Item ${i}`);
+    }
+  }
 
   build() {
     List() {
-      LazyForEach(this.items, (item: string, index: number) => {
-        ListItem() {
-          Text(item)
-        }
-        .key(`item-${index}`)
-      })
+      LazyForEach(this.data,
+        (item: string) => {
+          ListItem() {
+            Text(item)
+          }
+        },
+        (item: string) => item)
     }
   }
-  // GOOD: LazyForEach only renders visible items
+  // GOOD: LazyForEach renders only visible items; data updates via DataChangeListener
 }
 ```
 
+**Note:** On API 12+, `Repeat`（官方推荐，键值作为参数传入）是替代 ForEach/LazyForEach 的更优选择。
+
 ### 5.2 @Trace for Property-Level Updates
+
+`@Trace` 是状态管理 V2 装饰器（API 12+），在 `@ObservedV2` 类中标记需要**属性级观测**的字段。注意：`@Local`/`@Trace` 等 V2 装饰器**只能用于 @ComponentV2 组件**，在 @Component 中使用会编译报错。
 
 #### ❌ Incorrect
 
 ```typescript
 @ObservedV2
 class Product {
-  @Trace name: string = "";
-  @Trace price: number = 0;
-  @Trace stock: number = 0;
+  name: string = "";   // 缺少 @Trace——属性变化无法被观察
+  price: number = 0;
 }
 
-@Component
+@ComponentV2
 struct ProductCard {
   @Local product: Product = new Product();
 
   build() {
     Column() {
-      Text(this.product.name)    // Updates when ANY property changes
-      Text(`$${this.product.price}`)
+      Text(this.product.name)   // 修改 name 不会刷新
     }
   }
 }
@@ -774,19 +888,18 @@ struct ProductCard {
 ```typescript
 @ObservedV2
 class Product {
-  @Trace name: string = "";
+  @Trace name: string = "";    // @Trace：属性级观测，name 变化只刷新使用 name 的节点
   @Trace price: number = 0;
-  @Trace stock: number = 0;
 }
 
-@Component
+@ComponentV2
 struct ProductCard {
   @Local product: Product = new Product();
 
   build() {
     Column() {
-      Text(this.product.name)    // Only updates when name changes
-      Text(`$${this.product.price}`)  // Only updates when price changes
+      Text(this.product.name)        // 仅 name 变化时刷新
+      Text(`$${this.product.price}`) // 仅 price 变化时刷新
     }
   }
 }
@@ -865,7 +978,7 @@ Developers migrating from Android often copy-paste Android patterns that don't e
 | Android | HarmonyOS | Notes |
 |---------|-----------|-------|
 | `java.io.File` | `@ohos.file.fs` | No global `File` type in ArkTS |
-| `FOREGROUND_SERVICE` | `BackgroundMode.LONG_TASK` | Different enum values |
+| `FOREGROUND_SERVICE` | `@ohos.resourceschedule.backgroundTaskManager` + 具体 `BackgroundMode`（`DATA_TRANSFER`/`AUDIO_PLAYBACK`/`TASK_KEEPING` 等） | `LONG_TASK` 枚举不存在；旧 `@ohos.backgroundTaskManager` 自 API 9 起废弃 |
 | `SharedPreferences` | `@ohos.data.preferences` | API structure differs |
 | `Intent` | `Want` | Different parameter passing |
 | `Activity` | `UIAbility` | Lifecycle methods differ |
@@ -881,13 +994,11 @@ Using `.so` files in ArkTS requires a complete chain:
 ```
 1. NAPI Implementation (C/C++)
    ↓
-2. Compile to .so
+2. CMake 编译为 .so（build-profile.json5 的 buildOption.externalNativeOptions 配置，输出至 libs/<abi>/）
    ↓
 3. Create .d.ts type declarations
    ↓
-4. Register in module.json5 nativeLibs
-   ↓
-5. Import in ArkTS: import native from 'libxxx.so'
+4. Import in ArkTS: import native from 'libxxx.so'
 ```
 
 #### ❌ Incorrect
@@ -906,8 +1017,8 @@ declare module 'libnearshare_native.so' {
   export function transfer(data: ArrayBuffer): number;
 }
 
-// 2. Register in module.json5
-// "nativeLibs": { "libnearshare_native.so": { "armor": "arm64-v8a" } }
+// 2. 编译配置位于 build-profile.json5（不是 module.json5，module.json5 无 nativeLibs 字段）：
+//    "buildOption": { "externalNativeOptions": { "path": "./CMakeLists.txt", "cppFlags": "", "arguments": "" } }
 
 // 3. Import with types
 import { initialize, transfer } from 'libnearshare_native.so';
@@ -1010,8 +1121,8 @@ entry/src/main/
 | Level | Description | Examples | Action |
 |-------|-------------|----------|--------|
 | **CRITICAL** | Syntax violation, state bug | any/unknown, missing @State, wrong decorator | Fix immediately |
-| **HIGH** | Performance, memory leak | Missing LazyForEach, timer leak, deprecated router | Fix before merge |
-| **MEDIUM** | Style, naming | Missing return type, inconsistent naming | Fix or accept |
+| **HIGH** | Performance, memory leak | Missing LazyForEach, timer leak, not-recommended router | Fix before merge |
+| **MEDIUM** | Style, naming | Missing explicit return type (style), inconsistent naming | Fix or accept |
 
 ### References
 

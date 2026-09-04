@@ -85,19 +85,19 @@ arkts-expert/
 
 | 优先级 / Priority | 维度 / Dimension | 关键检查项 / Key Checks |
 | :---------------- | :--------------- | :---------------------- |
-| 🔴 **CRITICAL** | ArkTS 语法 / ArkTS Syntax | no-any-unknown, limited-throw, inferred-generics, implicit-return-types |
+| 🔴 **CRITICAL** | ArkTS 语法 / ArkTS Syntax | no-any-unknown, limited-throw, inferred-generics（显式返回类型为风格项，非编译规则） |
 | 🔴 **CRITICAL** | 状态管理 / State Management | V1/V2 装饰器正确性、状态重复、更新触发 / V1/V2 decorator correctness, state duplication, update triggers |
 | 🔴 **CRITICAL** | UI 组件 / UI Components | 组件生命周期、重渲染优化、@Builder / Component lifecycle, re-render optimization, @Builder |
 | 🟠 **HIGH** | 导航路由 / Navigation | Router vs Navigation、深度链接、页面栈 / Router vs Navigation, deep links, page stack |
-| 🟠 **HIGH** | 性能优化 / Performance | LazyForEach、@Track、不可变状态 / LazyForEach, @Track, immutable state |
+| 🟠 **HIGH** | 性能优化 / Performance | LazyForEach/Repeat、@Track（V1 属性级更新）/@Trace（V2 属性级观测）、不可变状态（V1 语义） / LazyForEach/Repeat, @Track (V1 property-level update) / @Trace (V2 property-level observation), immutable state (V1 semantics) |
 | 🟠 **HIGH** | 副作用 / Side Effects | 定时器清理、内存泄漏、aboutToAppear/Disappear / Timer cleanup, memory leaks, lifecycle |
 | 🟠 **HIGH** | Android 迁移 / Android Migration | 概念映射、API 翻译、原生模块链 / Concept mapping, API translation, native module chain |
 | 🟡 **MEDIUM** | 代码风格 / Code Style | 命名规范、项目结构、注释 / Naming conventions, project structure, comments |
 
 ### Rule 0：版本检测（元规则） / Rule 0: Version Detection (Meta-Rule)
-自动识别目标 API 版本（API 9/10/12+），根据版本调整状态管理策略（V1/V2）和导航方式（router/Navigation）。
+自动识别目标 API 版本（API 9 / 10-11 / 12+），根据版本调整状态管理策略（V1/V2，V2 仅 API 12+）和导航方式（router 不推荐 / Navigation）。
 
-Automatically identifies target API version (API 9/10/12+) and adjusts state management strategy (V1/V2) and navigation approach (router/Navigation) accordingly.
+Automatically identifies target API version (API 9 / 10-11 / 12+) and adjusts state management strategy (V1/V2, V2 is API 12+ only) and navigation approach (router not recommended / Navigation) accordingly.
 
 ---
 
@@ -148,9 +148,9 @@ Automatically identifies target API version (API 9/10/12+) and adjusts state man
 bash scripts/arkts-lint.sh src/main/ets/pages/Index.ets
 ```
 
-自动检测：any/unknown 使用、非 Error throw、缺失泛型参数、缺失返回类型、废弃 router 使用。
+自动检测：any/unknown 使用、非 Error throw、裸 new Promise()（缺泛型）、缺失返回类型（风格项）、不推荐 router 使用。
 
-Automatically detects: any/unknown usage, non-Error throws, missing generic params, missing return types, deprecated router usage.
+Automatically detects: any/unknown usage, non-Error throws, bare new Promise() (missing generic), missing return types (style), not-recommended router usage.
 
 ---
 
@@ -194,7 +194,7 @@ Automatically detects: any/unknown usage, non-Error throws, missing generic para
 ---
 
 ### 版本历史 / Version History
-- **v1.0** — 初始版本：8 维度规则体系、5 参考文件、1 工具脚本、Android 迁移映射 / Initial release: 8-dimension rule system, 5 reference files, 1 tool script, Android migration mapping
+- **v1.0** — 初始版本：8 维度规则体系、5 参考文件、2 工具脚本、Android 迁移映射 / Initial release: 8-dimension rule system, 5 reference files, 2 tool scripts, Android migration mapping
 
 ---
 

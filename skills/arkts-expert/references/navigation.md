@@ -1,8 +1,8 @@
 # Navigation & Routing Deep Reference
 
-## Router (Deprecated) → Navigation Migration
+## Router (Not Recommended) → Navigation Migration
 
-### Router API (Deprecated)
+### Router API (Not Recommended)
 
 ```typescript
 import router from "@ohos.router";
@@ -23,16 +23,21 @@ const params = router.getParams() as MyParams;
 ### Navigation API (Recommended)
 
 ```typescript
-import { Navigation, NavDestination, NavPathStack } from "@kit.ArkUI";
+// Navigation / NavDestination / NavPathStack 均为 ArkUI 内置能力，无需 import
+// （@kit.ArkUI 与 @ohos.arkui 均不导出这些组件/类，不存在此类导入语句）
 
 @Entry
 @Component
 struct MainPage {
   private pageStack: NavPathStack = new NavPathStack();
 
-  aboutToAppear() {
-    // Register route mapping
-    this.pageStack.register("DetailPage", "DetailPage");
+  // 路由映射通过 Navigation 的 navDestination 属性注册
+  // （NavPathStack 没有 register() 方法）
+  @Builder
+  PageMap(name: string) {
+    if (name === "DetailPage") {
+      DetailPage()
+    }
   }
 
   build() {
@@ -40,35 +45,37 @@ struct MainPage {
       Column() {
         Button("Go to Detail")
           .onClick(() => {
-            // Navigation-based routing with NavPathStack
-            this.pageStack.pushPath({ name: "DetailPage", param: { id: 123 } });
+            // Navigation-based routing with NavPathStack (API 10+)
+            this.pageStack.pushPathByName("DetailPage", { id: 123 });
           })
       }
     }
     .title("My App")
+    .navDestination(this.PageMap)
   }
-}
-
-@Builder
-DetailPageBuilder() {
-  DetailPage()
 }
 
 @Component
 struct DetailPage {
-  @Param id: number = 0;
-
   build() {
-    Column() {
-      Text(`Detail Page - ID: ${this.id}`)
-      Button("Go Back")
-        .onClick(() => {
-          // Access NavPathStack via this.getUIContext()
-          this.getUIContext().getNavPathStack().pop();
-        })
+    NavDestination() {
+      Column() {
+        Text("Detail Page")
+        Button("Go Back")
+          .onClick(() => {
+            // 通过 UIContext 获取 NavPathStack 并出栈
+            this.getUIContext().getNavPathStack().pop();
+          })
+      }
     }
+    .title("Detail")
   }
 }
+
+// 说明：
+// - 跳转参数经 pushPathByName(name, param) 传入；取参需在 NavDestination 的
+//   onReady 回调中或经 pathStack.getParamByIndex() 获取（返回值 unknown | undefined，需 as 转换）。
+// - @Param 等 V2 装饰器只能用于 @ComponentV2，在 @Component 中使用会编译报错。
 ```
 
 ## NavPathStack API Reference
@@ -82,31 +89,39 @@ struct DetailPage {
 | `popToIndex()` | Pop to index | `this.pageStack.popToIndex(0)` |
 | `clear()` | Clear entire stack | `this.pageStack.clear()` |
 | `getAllPathName()` | Get all page names | `this.pageStack.getAllPathName()` |
-| `getParamByIndex()` | Get params by index | `this.pageStack.getParamByIndex(0)` |
+| `getParamByIndex()` | Get params by index (returns `unknown | undefined`, API 10+) | `this.pageStack.getParamByIndex(0)` |
 | `moveToTop()` | Move page to top | `this.pageStack.moveToTop("Detail")` |
 | `moveIndexToTop()` | Move index to top | `this.pageStack.moveIndexToTop(2)` |
 | `removeByName()` | Remove page by name | `this.pageStack.removeByName("Detail")` |
 | `removeIndex()` | Remove by index | `this.pageStack.removeIndex(1)` |
 | `replacePath()` | Replace current page | `this.pageStack.replacePath({ name: "New" })` |
 | `replacePathByName()` | Replace by name | `this.pageStack.replacePathByName("New", params)` |
-| `getIndexByName()` | Get index by name | `this.pageStack.getIndexByName("Detail")` |
+| `getIndexByName()` | Get all indices by name (returns `Array<number>`, API 10+) | `this.pageStack.getIndexByName("Detail")` |
 
 ## Deep Link Configuration
 
-In `module.json5`:
+URI 深链在 `module.json5` 的 **abilities[].skills[].uris** 数组中配置（官方示例；字段：scheme/host/port/path，其中 path 与 pathStartWith/pathRegex 三选一）：
 
 ```json
 {
   "module": {
-    "uriOptions": {
-      "domains": [
-        {
-          "scheme": "myapp",
-          "host": "detail",
-          "path": "/page"
-        }
-      ]
-    }
+    "abilities": [
+      {
+        "skills": [
+          {
+            "actions": ["ohos.want.action.home"],
+            "entities": ["entity.system.home"],
+            "uris": [
+              {
+                "scheme": "myapp",
+                "host": "detail",
+                "path": "/page"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -136,32 +151,35 @@ this.navPathStack.replacePath({ name: "NewPage" });
 
 ## Common Mistakes
 
-### 1. Missing Route Configuration
+### 1. Missing Page Declaration (Router)
 ```typescript
-// ❌ Page not registered in module.json5
-router.pushUrl({ url: "pages/UnregisteredPage" });
+// ❌ 页面未在 main_pages.json（resources/base/profile）中声明
+router.pushUrl({ url: "pages/UnregisteredPage" });  // 跳转失败
 
-// ✅ Ensure page is in module.json5 routes
+// ✅ 先在 main_pages.json 的 pages 数组中声明该页面再跳转
+// （Navigation 无需页面清单：路由映射经 .navDestination(builder) 注册）
 ```
 
 ### 2. Wrong Param Passing
 ```typescript
-// ❌ Type-unsafe params
-const id = router.getParams()["id"];  // No type checking
+// ❌ 索引访问非法：ArkTS 禁止 obj["field"]（arkts-no-props-by-index），
+//    且 getParams() 返回 Object，既无类型检查也无法编译
+// const id = router.getParams()["id"];
 
-// ✅ Typed params
+// ✅ 先声明类型，再用 as 转换后访问
 interface DetailParams {
   id: number;
   name: string;
 }
 const params = router.getParams() as DetailParams;
+const id = params.id;
 ```
 
-### 3. Using Deprecated Router in New Code
+### 3. Using Not-Recommended Router in New Code
 ```typescript
-// ❌ Deprecated since API 9
+// ❌ 官方文档标注"不推荐"（无版本化废弃声明）
 import router from "@ohos.router";
 
-// ✅ Use Navigation component
-import { Navigation, NavPathStack } from "@kit.ArkUI";
+// ✅ Use Navigation component（Navigation 为内置组件，无需 import）
+// @Entry @Component struct Page { private pathStack: NavPathStack = new NavPathStack(); ... }
 ```

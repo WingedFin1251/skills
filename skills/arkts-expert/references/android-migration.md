@@ -5,7 +5,7 @@
 | Android | HarmonyOS | Notes |
 |---------|-----------|-------|
 | `java.io.File` | `@ohos.file.fs` | No global `File` type in ArkTS |
-| `FOREGROUND_SERVICE` | `BackgroundMode.LONG_TASK` | Different enum values |
+| `FOREGROUND_SERVICE` | `@ohos.resourceschedule.backgroundTaskManager` + 具体 `BackgroundMode`（`DATA_TRANSFER`/`AUDIO_PLAYBACK`/`TASK_KEEPING` 等） | `BackgroundMode.LONG_TASK` 不存在；旧 `@ohos.backgroundTaskManager` 自 API 9 起废弃 |
 | `SharedPreferences` | `@ohos.data.preferences` | API structure differs |
 | `Intent` | `Want` | Different parameter passing |
 | `Activity` | `UIAbility` | Lifecycle methods differ |
@@ -15,7 +15,7 @@
 | `Socket.remoteInfo` | `@ohos.net.socket` | Different structure |
 | `ContentProvider` | `@ohos.data.dataShare` | Different API |
 | `BroadcastReceiver` | `CommonEventManager` | Different registration |
-| `Service` | `BackgroundTaskManager` | Different lifecycle |
+| `Service` | `BackgroundTaskManager`（长时任务 `startBackgroundRunning`） | 受系统长时任务配额限制；轻量后台逻辑用 ExtensionAbility |
 | `Notification` | `NotificationManager` | Different API |
 
 ## API Translation Examples
@@ -79,7 +79,8 @@ const want: Want = {
     id: 123
   }
 };
-startAbility(want);
+// startAbility 需要上下文（UIAbility 中为 this.context.startAbility(want)）
+this.context.startAbility(want);
 ```
 
 ## Native Module Declaration Chain
@@ -89,13 +90,11 @@ Using `.so` files in ArkTS requires a complete chain:
 ```
 1. NAPI Implementation (C/C++)
    ↓
-2. Compile to .so
+2. CMake 编译为 .so（build-profile.json5 的 buildOption.externalNativeOptions 配置，输出至 libs/<abi>/）
    ↓
 3. Create .d.ts type declarations
    ↓
-4. Register in module.json5 nativeLibs
-   ↓
-5. Import in ArkTS: import native from 'libxxx.so'
+4. Import in ArkTS: import native from 'libxxx.so'
 ```
 
 ### Example
@@ -105,18 +104,19 @@ Using `.so` files in ArkTS requires a complete chain:
 // src/main/ets/libxxx.d.ts
 declare module 'libxxx.so' {
   export function initialize(): void;
-  export function process(data: ArrayBuffer): number;
+  export function processData(data: ArrayBuffer): number;
 }
 ```
 
-#### 2. Register in module.json5
+#### 2. Configure build in build-profile.json5
+（module.json5 中不存在 nativeLibs 字段；.so 由 CMake 经 externalNativeOptions 编译输出）
 ```json
 {
-  "module": {
-    "nativeLibs": {
-      "libxxx.so": {
-        "armor": "arm64-v8a"
-      }
+  "buildOption": {
+    "externalNativeOptions": {
+      "path": "./CMakeLists.txt",
+      "arguments": "",
+      "cppFlags": ""
     }
   }
 }
@@ -124,10 +124,11 @@ declare module 'libxxx.so' {
 
 #### 3. Import in ArkTS
 ```typescript
-import { initialize, process } from 'libxxx.so';
+import { initialize, processData } from 'libxxx.so';
 
 initialize();
-const result = process(buffer);
+const data = new ArrayBuffer(8);
+const result = processData(data);
 ```
 
 ## Common Migration Mistakes
@@ -144,11 +145,18 @@ const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
 
 ### 2. Wrong Background Mode
 ```typescript
-// ❌ Android enum value
+// ❌ Android enum value（ArkTS 中不存在 FOREGROUND_SERVICE）
 BackgroundMode.FOREGROUND_SERVICE;
 
-// ✅ HarmonyOS enum value
-BackgroundMode.LONG_TASK;
+// ✅ 官方模块 @ohos.resourceschedule.backgroundTaskManager 的 BackgroundMode
+//    （注意：BackgroundMode.LONG_TASK 也不存在！）
+import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
+
+backgroundTaskManager.startBackgroundRunning(
+  context,
+  backgroundTaskManager.BackgroundMode.DATA_TRANSFER,  // 按场景选择：DATA_TRANSFER/
+  wantAgent);                                          // AUDIO_PLAYBACK/LOCATION/TASK_KEEPING 等
+// 旧模块 @ohos.backgroundTaskManager 自 API 9 起废弃
 ```
 
 ### 3. Missing Native Module Types

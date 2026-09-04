@@ -1,6 +1,10 @@
 #!/bin/bash
 # ArkTS static analysis wrapper
 # Usage: bash arkts-lint.sh <source-file>
+#
+# 说明：启发式初筛脚本（grep 规则），不是官方 Code Linter。
+# 规则名对应官方 ArkTS 规范约束（arkts-no-any-unknown / arkts-limited-throw / ...），
+# 命中结果仅供提示，需人工复核，避免误报/漏报。
 
 FILE="$1"
 if [ -z "$FILE" ]; then
@@ -34,30 +38,33 @@ else
 fi
 echo ""
 
-# Check for missing generic params
-echo "--- Checking arkts-no-inferred-generic-params ---"
-if grep -n 'Promise(' "$FILE" | grep -v 'Promise<'; then
-    echo "❌ Found Promise without type parameter"
+# Check Promise constructor type parameters
+# 官方规则 10605034：可从参数推断时允许省略（如 Promise.resolve(42) 合法）；
+# 只有 new Promise( 无法从参数推断 T，必须显式 new Promise<T>()。
+echo "--- Checking arkts-no-inferred-generic-params (bare new Promise() ---"
+if grep -nE 'new Promise\(' "$FILE" | grep -v '^[[:space:]]*//'; then
+    echo "❌ Found new Promise( without type parameter (need new Promise<T>())"
 else
-    echo "✅ All Promises have explicit type params"
+    echo "✅ No bare new Promise( constructors found"
 fi
 echo ""
 
-# Check for missing return types (basic check)
-echo "--- Checking arkts-no-implicit-return-types ---"
-if grep -n 'function.*).*{' "$FILE" | grep -v ':' | grep -v '//' | head -5; then
-    echo "⚠️  Possible missing return types (manual review needed)"
+# Check for missing return types（风格项，非编译规则——见 AGENTS.md §1.4；
+# 官方无 arkts-no-implicit-return-types 规则，强制的是 10605999 严格类型检查）
+echo "--- Checking explicit return types (style) ---"
+if grep -nE 'function [A-Za-z_][A-Za-z0-9_]*\([^)]*\) *\{' "$FILE" | grep -v '^[[:space:]]*//' | head -5; then
+    echo "⚠️  Possible missing return types (style item, manual review needed)"
 else
     echo "✅ Return types appear to be explicit"
 fi
 echo ""
 
-# Check for deprecated router usage
-echo "--- Checking for deprecated router ---"
-if grep -n 'import.*router.*from.*@ohos.router' "$FILE"; then
-    echo "⚠️  Using deprecated router — consider migrating to Navigation"
+# Check for not-recommended router usage（@ohos.router 官方标注"不推荐"，无版本化废弃）
+echo "--- Checking for not-recommended router (@ohos.router) ---"
+if grep -nE "from ['\"]@ohos\.router" "$FILE"; then
+    echo "⚠️  Using not-recommended router — consider migrating to Navigation"
 else
-    echo "✅ No deprecated router usage"
+    echo "✅ No @ohos.router usage"
 fi
 echo ""
 

@@ -30,10 +30,11 @@ Use this skill when:
 
 **Explicit triggers:** ArkTS, HarmonyOS, ArkUI, @State, @Prop, @Link,
 @Observed, @ObjectLink, @Provide, @Consume, @Watch, @Trace, @Builder,
-Navigation, NavDestination, Router, Tabs, List, Grid, GridItem,
-LazyForEach, animateTo, transition, UIAbility, AbilityStage,
-appStorage, persistentStorage, Preferences, hilog, resource, OHOS,
-module.json5, NAPI, .hap, .hsp
+@ComponentV2, @Local, @Param, @Once, @Event, @Monitor, @ObservedV2,
+@Computed, AppStorageV2, Navigation, NavDestination, NavPathStack,
+Router, Tabs, List, Grid, GridItem, LazyForEach, Repeat, animateTo,
+transition, UIAbility, AbilityStage, AppStorage, PersistentStorage,
+Preferences, hilog, resource, OHOS, module.json5, NAPI, .hap, .hsp
 
 ## ⚙️ Rule 0: HarmonyOS Version Detection (Meta-Rule)
 
@@ -41,15 +42,15 @@ module.json5, NAPI, .hap, .hsp
 
 Before any review, determine the target HarmonyOS API version:
 
-| Heuristic | API 9 | API 10+ | API 12+ |
-|-----------|-------|---------|---------|
-| State Mgmt | V1 decorators | V1 + V2 preview | V2 stable |
-| Navigation | router (deprecated) | Navigation component | Navigation + NavDestination |
-| Component | struct components | struct + custom | Custom Component Model |
-| Module | module.json5 | module.json5 | module.json5 + stage model |
+| Heuristic | API 9 | API 10-11 | API 12+ |
+|-----------|-------|-----------|---------|
+| State Mgmt | V1 only (@State/@Prop/@Link/@Observed/@ObjectLink/@Provide/@Consume/@Watch) | V1 only — V2 does NOT exist below API 12 (V1 于 API 7 推出、V2 于 API 12 推出) | V2 (@ComponentV2/@Local/@Param/@Once/@Event/@Monitor/@ObservedV2/@Trace/@Computed); official guidance: prefer V2 for new code |
+| Navigation | Navigation (API 8+) + NavRouter; router = "not recommended" (no version-based deprecation) | Navigation + NavPathStack (preferred); avoid router | Navigation + NavPathStack; pages are NavDestination |
+| Component | @Component + struct | @Component + struct | @ComponentV2 + struct (or @Component) |
+| Module | Stage model + module.json5 (standard since API 9) | Stage model + module.json5 | Stage model + module.json5 |
 
-**If API 9:** Apply V1 state management only. Flag deprecated router usage.
-**If API 10+:** Prefer Navigation over router. Use V1 state management.
+**If API 9-11:** Apply V1 state management only. V2 decorators must NOT be used (API 12+ only).
+**All versions:** Prefer Navigation over router. Router is "not recommended" in official docs.
 **If API 12+:** Recommend V2 state management for new code. Migration guide for V1.
 
 ## Development Process
@@ -97,14 +98,14 @@ Check `build()` functions for anti-patterns. See AGENTS.md §3.
 
 ### 5. **Navigation & Routing Review** (🟠 HIGH)
 Check router usage vs Navigation component. See AGENTS.md §4.
-- Deprecated `@ohos.router` usage → 🟠 HIGH
-- Missing deep link configuration → 🟡 MEDIUM
+- `@ohos.router` usage (not recommended in official docs) → 🟠 HIGH
+- Missing deep link configuration (module.json5 skills[].uris) → 🟡 MEDIUM
 
 ### 6. **Performance Review** (🟠 HIGH)
 Check list/grid patterns and state efficiency. See AGENTS.md §5.
-- `ForEach` on large lists (should be `LazyForEach`) → 🟠 HIGH
-- Missing `@Trace` for property-level updates → 🟠 HIGH
-- Mutating state instead of creating new reference → 🟠 HIGH
+- `ForEach` on large lists (should be `LazyForEach`/`Repeat`) → 🟠 HIGH
+- Missing `@Trace` for property-level updates → 🟠 HIGH (V2/API 12+ targets only — @Trace does not exist below API 12)
+- Mutating state instead of creating new reference → 🟠 HIGH (V1 semantics only; in V2/@Trace code in-place mutation is expected)
 
 ### 7. **Android Migration Review** (🟠 HIGH)
 Check for Android concept leakage. See AGENTS.md §7.
