@@ -5,6 +5,8 @@
 > ① 机制层：Fix Dependency Graph（修复依赖/冲突图）
 > ② 流程层：诊断与规划分离（两阶段产出）
 > ③ 形式化层：修复条目 DSL（Preconditions / Postconditions / Side_Effects）
+>
+> **术语**：本文的"诊断/规划"指**产出时序**；与 SKILL.md 的 Stage 1/Stage 2（审查深度）是不同维度，勿混用。
 
 ---
 
@@ -33,7 +35,7 @@
       影响: 用户可感知的功能后果（定级依据）
 ```
 
-**禁止**：输出任何代码块/伪代码修复方案、不得给出 Approach。
+**禁止**：任何修复性代码或 Approach。证据引用允许**行内短引用（≤3 行原样代码）**，用于佐证问题，不属于修复方案。
 **目的**：获得稳定的全局问题视图——先让"发现"穷尽，不被"方案"带偏。
 **产出**：问题清单是阶段二的唯一输入；用户确认清单后（增删/定级），才进入阶段二。
 
@@ -94,7 +96,8 @@ Resolution:
 | Approach | ✅ | 具体方案一句话；**若被 Resolution 变更，保留原 Approach 并标注"已否决"** |
 | Preconditions | ✅ | 方案落地前必须成立的模块/状态/接口条件。**任何一项不满足 → 该修复必须进后续批次** |
 | Postconditions | ✅ | 落地后成立的状态/行为（供后续修复声明 depends on） |
-| Side_Effects | ✅ | 非目标副作用：新增/删除依赖边、行为变化、范围。**写 "None" 也算声明** |
+| Side_Effects | ✅ | 非目标副作用。**必须结构化枚举**（便于冲突检测做键集比较）：`Dependency: ±<模块边>` / `State: ±<状态键>` / `Behavior: <行为变化>` / `Scope: <文件或模块>`。**写 "None" 也算声明** |
+| Evidence | 条件 | Preconditions/Side_Effects/Conflicts_With 中提及具体模块、状态键或依赖边的条目须附 `文件:行` 证据；无法验证的标"假设：待确认"。**禁止编造引用** |
 | Conflicts_With | 条件 | 与任何已声明修复的 Target/Postconditions 冲突时必填 + 原因 |
 | Resolution | 条件 | 有 Conflicts_With 时必填 |
 
@@ -103,7 +106,9 @@ Resolution:
 1. 对每条修复 X：检查 X.Side_Effects 是否破坏任何未解决修复 Y 的 Preconditions 或 Target。
 2. 若 Y.Preconditions 包含某模块/接口，而 X.Side_Effects 声明"移除/重构该模块" → 必须出现冲突边 X↔Y + Resolution。
 3. 批次顺序 = 依赖拓扑序：`depends on` 的修复必须排在前面。
-4. **无冲突声明 ≠ 无冲突**：所有修复的 Side_Effects 交集为空才算真正无冲突。
+4. **无冲突声明 ≠ 无冲突**：所有修复的 Side_Effects 交集为空才算真正无冲突（Side_Effects 须结构化枚举，见字段表）。
+5. **环检测**：`depends on` 边出现环（A→B→A）→ 无拓扑序可用——必须拆分/合并修复或声明互斥，禁止原样分批。
+6. **重复方案检测**：两个修复 Target 相同而未声明 `alternative to` 或未合并 → 违规。
 
 ---
 
@@ -169,3 +174,4 @@ graph LR
 - 本流程是 **Stage 2 / 服务层审查流之后的报告环节**，不替代 §1-§10 的发现规则。
 - 发现阶段（维度 1-10 + service-layer.md）产出**问题**；本文件规范**修复**的组织方式。
 - 定级口径沿用 service-layer.md 结论校准：按"用户可感知的功能影响"，不引用语法规则名。
+- Resolution 的选型同样受 **service-layer.md 平台能力验证门（§10.3）** 约束：如"事件方案"须落到官方机制（@ohos.events.emitter / AppStorage 键监听），不得引入新的平台概念泄漏。

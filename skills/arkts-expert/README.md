@@ -70,8 +70,10 @@ arkts-expert/
 │   │                           # Optimization patterns
 │   ├── android-migration.md    # Android ↔ HarmonyOS 概念映射表
 │   │                           # Android ↔ HarmonyOS concept mapping
-│   └── service-layer.md        # 服务层/结构性问题审查流（非 UI 类）
-│                               # Service-layer / structural audit flow
+│   ├── service-layer.md        # 服务层/结构性问题审查流（非 UI 类）
+│   │                           # Service-layer / structural audit flow
+│   └── fix-planning.md         # 修复规划与协调（Fix Dependency Graph / DSL / 两阶段）
+│                               # Fix planning & coordination (dependency graph / DSL / two-phase)
 └── scripts/
     ├── arkts-lint.sh           # ArkTS 静态分析包装器 (Bash)
     │                           # ArkTS static analysis wrapper (Bash)
@@ -107,9 +109,9 @@ Automatically identifies target API version (API 9 / 10-11 / 12+) and adjusts st
 
 ## 工作流程 / Workflow
 
-当技能触发时，AI 依次执行 9 步工作流；**Stage 2 按文件角色分叉**：被审对象为封装类/服务类/Worker 类时，导航/性能/迁移检查（Step 5-8）替换为服务层审查流（维度 9/10，见 references/service-layer.md）。
+当技能触发时，AI 依次执行 9 步工作流；**Stage 2 按文件角色分叉**：被审对象为封装类/服务类/Worker 类时，导航/性能/迁移检查（Step 5-8）替换为服务层审查流（维度 9/10，见 references/service-layer.md）。**报告两阶段产出（v2.1）**：诊断（问题清单，无修复代码）→ 规划（修复 DSL + 依赖图 + 分批）；≥3 个修复或共享目标时启用修复协调（references/fix-planning.md）。
 
-When the skill triggers, the AI executes a 9-step workflow; **Stage 2 branches by file role**: for wrapper/service/Worker classes, checks 5-8 are replaced by the Service-Layer Audit flow (dimensions 9-10, see references/service-layer.md).
+When the skill triggers, the AI executes a 9-step workflow; **Stage 2 branches by file role**: for wrapper/service/Worker classes, checks 5-8 are replaced by the Service-Layer Audit flow (dimensions 9-10, see references/service-layer.md). **Two-phase reporting (v2.1)**: Diagnosis (issues only) → Planning (fix DSL + dependency graph + batches); fix coordination activates at ≥3 fixes or shared targets (references/fix-planning.md).
 
 ```
 ╔═══════════════════════════════════════════╗
@@ -204,6 +206,7 @@ Automatically detects: any/unknown usage, non-Error throws, bare new Promise() (
 ---
 
 ### 版本历史 / Version History
+- **v2.1** — 修复协调三层约束：Fix Dependency Graph + 诊断/规划分离 + 修复 DSL；新增 references/fix-planning.md；AGENTS.md §11；报告两阶段产出 / Fix coordination: dependency graph + diagnosis/planning split + fix DSL; new references/fix-planning.md; AGENTS.md §11; two-phase reports
 - **v2.0** — 维度升级：8 → 10（新增服务层一致性、平台运行时与结构安全）；Stage 2 角色分叉审查流；新增 references/service-layer.md；Two-Stage 流程 v2.0 / Dimension upgrade 8 → 10 (service-layer consistency, platform runtime & structural safety); Stage 2 role-based branching; new references/service-layer.md
 - **v1.0** — 初始版本：8 维度规则体系、5 参考文件、2 工具脚本、Android 迁移映射 / Initial release: 8-dimension rule system, 5 reference files, 2 tool scripts, Android migration mapping
 

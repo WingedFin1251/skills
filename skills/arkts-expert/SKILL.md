@@ -187,7 +187,7 @@ This section defines how to allocate your limited context attention.
 
 ## Code Review Output Format
 
-**两阶段产出（v2.1 — MANDATORY）**：诊断与规划分离——先发布阶段一，用户确认问题清单后，再发布阶段二。≥3 个修复或修复触及同一目标时，启用修复协调流程（AGENTS.md §11 + references/fix-planning.md）。
+**两阶段产出（v2.1 — MANDATORY）**：诊断与规划分离。**交付模式**：默认单稿内分区输出（问题清单 → 修复规划，规划标注"待确认后实施"）；用户明确要求先诊断、或影响面大（≥5 修复/跨模块重构）时分两轮交付。≥3 个修复或修复触及同一目标时，启用修复协调流程（AGENTS.md §11 + references/fix-planning.md）。
 
 ### 阶段一：问题诊断报告（仅列问题，禁止修复代码）
 

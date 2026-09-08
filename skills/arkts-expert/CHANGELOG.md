@@ -1,5 +1,17 @@
 # arkts-expert 变更日志
 
+## [2.1.1] — 2026-08-28
+
+### 修复（fix-coordination 规范缺陷与同步问题）
+- **交付模式澄清**（SKILL.md / AGENTS.md §11.2 / 报告格式）：诊断与规划默认**单稿内分区**输出（规划标注"待确认后实施"）；分两轮交付仅当用户明确要求或影响面大（≥5 修复/跨模块重构）——原"先发布阶段一、用户确认后再发布阶段二"的强制两轮与常态单轮审查冲突
+- **证据引用自相矛盾修正**（AGENTS.md §11.2 / fix-planning.md 阶段一）：澄清"禁止代码块"= 禁止**修复性代码**；问题证据允许行内短引用（≤3 行原样代码）——原措辞"禁止任何代码块"与模板中 Evidence 代码引用要求互斥
+- **DSL 补 Evidence 字段**（fix-planning.md 字段表）：Preconditions/Side_Effects/Conflicts_With 中提及具体模块/状态键的条目须附文件:行证据或标注"假设：待确认"，禁止编造引用（防幻觉）
+- **Side_Effects 强制结构化枚举**（fix-planning.md）：Dependency ±边 / State ±键 / Behavior / Scope——使核验规则 4"交集为空"可由键集比较实现（原自由文本无法机械化）
+- **补两条核验规则**：⑤ depends on 环检测（A→B→A 无拓扑序必须拆分/合并）；⑥ 同 Target 修复未声明 alternative to → 违规（重复方案漏检）
+- **术语消歧**（fix-planning.md 头部）：诊断/规划 = 产出时序；与 SKILL Stage 1/Stage 2（审查深度）勿混用
+- **验证门衔接**（fix-planning.md）：Resolution 选型受 service-layer.md 验证门约束（事件方案须落官方 emitter/AppStorage 机制）
+- **README.md 同步 v2.1**：结构树补 fix-planning.md、工作流补两阶段说明、版本历史补 v2.1（此前遗漏，仅 SKILL/AGENTS/CHANGELOG 升级）
+
 ## [2.1.0] — 2026-08-28
 
 ### 新增（修复协调性 — 三层约束）
