@@ -1,5 +1,18 @@
 # arkts-expert 变更日志
 
+## [2.1.0] — 2026-08-28
+
+### 新增（修复协调性 — 三层约束）
+- **新增 references/fix-planning.md**：修复规划与协调规范——把隐性冲突变成显性规则：
+  - **机制层**：Fix Dependency Graph（`depends on` / `conflicts with` / `alternative to` 三类边，文本或 Mermaid）
+  - **流程层**：两阶段产出分离（阶段一问题诊断报告禁止修复代码 → 用户确认 → 阶段二修复规划报告）
+  - **形式化层**：修复 DSL（Fix_ID/Target/Severity/Approach/Preconditions/Postconditions/Side_Effects/Conflicts_With/Resolution 必填字段）
+  - 依赖拓扑分批（Batch 1 无前置依赖…）、冲突消解模式、自动核验规则、输出检查清单
+- **AGENTS.md 新增 §11 Fix Coordination**：触发条件（≥3 修复或共享目标）、两阶段产出规范、DSL 强制字段与 5 条核验规则、冲突消解模式（依赖反转先行/事件方案/拦截器下沉）
+- **AGENTS.md 报告格式重构**：Code Review Report Format 拆为"阶段一问题诊断报告"与"阶段二修复规划报告"两套模板，各带自检清单；轻度审查（<3 修复）合并为单报告但必须声明 Fix Dependency Graph 无冲突
+- **SKILL.md 升级 v2.1**：Two-Stage Deep Review / Attention Budget / Skipped File Rules 版本号 v2.0→v2.1；报告输出格式同步两阶段；Quick Reference 新增 Fix Coordination 行；Bundled Resources 新增 fix-planning.md
+- 修复协调规则不依赖 HarmonyOS 平台断言（纯方法论），但 DSL 示例（AuthService/HttpClient/AppStorage/UNAUTHORIZED_EVENT）与 §9/§10 服务层审查流对齐
+
 ## [2.0.0] — 2026-08-28
 
 ### 新增（维度升级 8 → 10）

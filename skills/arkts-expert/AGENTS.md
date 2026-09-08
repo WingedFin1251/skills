@@ -24,11 +24,14 @@
 9. [Service-Layer Consistency](#9-service-layer-consistency)
 10. [Platform Runtime & Structural Safety](#10-platform-runtime--structural-safety)
 
+### Fix Coordination — **MANDATORY (≥3 fixes or shared targets)**
+11. [Fix Coordination (v2.1)](#11-fix-coordination修复协调--v21)
+
 ### Style — **MEDIUM**
 8. [Code Style & Organization](#8-code-style--organization)
 
 ### Review Process — **MANDATORY**
-11. [Attention Budget Guide](#attention-budget-guide--mandatory)
+12. [Attention Budget Guide](#attention-budget-guide-v20--mandatory)
 
 ---
 
@@ -1129,28 +1132,70 @@ entry/src/main/
 - 传输层不得 import 业务服务（循环依赖风险）
 - `hvigor --analyze` 现行语义为构建耗时分析；模块依赖用 DevEco Studio 依赖视图核对
 
+## 11. Fix Coordination（修复协调 — v2.1）
+
+**Impact: MANDATORY (≥3 fixes or shared targets) | Category: fix-coordination | Tags:** dependency-graph, preconditions, side-effects, batching
+
+### Why This Matters
+发现问题只是第一半。多个修复建议若触及同一模块/同一状态却彼此不知情，会出现"修复互相拆台"——例如 Fix_H6 要求 HttpClient 直接调用 AuthService.logout()，而 Fix_H4 的目标恰恰是移除 HttpClient→AuthService 依赖边。协调性必须从"靠模型自觉"变成"靠流程和结构强制"。
+
+### 11.1 触发条件（MANDATORY 判定）
+满足任一 → 必须启用 `references/fix-planning.md` 完整流程：
+- 报告含 **≥3 个修复建议**
+- 两个修复触及**同一模块/文件/状态**（同一服务类、同一 AppStorage 键、同一依赖边）
+- 一个修复"新增依赖"，另一个"消除依赖"（方向相反的边）
+- 一个修复要求调用某模块，另一个要求该模块重构/下线
+
+### 11.2 两阶段产出（Diagnosis → Planning 分离）
+
+**阶段一：问题诊断报告**
+- 内容：仅问题清单（Critical/High/Medium）+ 证据（文件:行）+ 影响分析
+- **禁止**：输出任何代码块或修复方案
+- 目的：获得稳定全局问题视图，方案不干扰发现
+
+**阶段二：修复规划报告**（以确认后的阶段一清单为唯一输入）
+- 每条修复填写 DSL（Fix_ID/Target/Severity/Approach/Preconditions/Postconditions/Side_Effects/Conflicts_With/Resolution）
+- 构建 Fix Dependency Graph（三种边：`depends on` / `conflicts with` / `alternative to`）
+- 按依赖拓扑分批（Batch 1 无前置依赖 → Batch 2 依赖 Batch 1…）
+- 每条冲突边必须给 Resolution（改 Approach / 调顺序 / 声明互斥交用户决策）
+- **禁止**：在阶段二引入阶段一清单之外的新问题
+
+### 11.3 DSL 强制字段与核验规则
+每个修复必填：Approach、Preconditions、Postconditions、Side_Effects（无副作用也写 "None"）。
+核验（强模型或脚本）：
+1. X.Side_Effects 破坏未解决修复 Y 的 Preconditions/Target → 必须出现冲突边 X↔Y + Resolution
+2. Y.Preconditions 依赖某模块，X.Side_Effects 声明移除/重构该模块 → 同上
+3. 批次顺序 = 依赖拓扑序（`depends on` 在前）
+4. "无冲突声明" ≠ "无冲突"——所有 Side_Effects 交集为空才算真无冲突
+5. Approach 被 Resolution 变更时，保留旧 Approach 并标注"已否决"
+
+### 11.4 冲突消解模式（服务层常见）
+- **依赖反转先行**：冲突源于"直接调用具体服务"——先落地接口抽取（依赖反转修复），后续修复依赖新接口而非具体类
+- **事件/回调方案**：跨模块行为用全局事件（如 'UNAUTHORIZED_EVENT'）替代直接调用，Side_Effects 归零
+- **拦截器下沉**：鉴权/日志/错误分类等横切关注点下沉官方拦截器链，逐方法修补的多个修复合并为单一拦截器修复
+
+详细规范（DSL 模板/图格式/分批示例/检查清单）见 `references/fix-planning.md`。
+
 ## Code Review Report Format
+
+**报告采用两阶段产出（v2.1 — MANDATORY）**：阶段一诊断与阶段二规划**分开发布**，用户确认问题清单后才产出规划。
+
+### 阶段一：问题诊断报告（禁止代码修复方案）
 
 ```markdown
 ## Summary
-[Brief overview of the code and main issues found]
+[Brief overview of the code and main issues found — 仅描述，不含修复建议]
 
 ## Critical Issues 🔴
 
 ### 1. [Issue Title]
 **File:** `path/to/file.ets:42`
 **Rule:** [arkts-no-any-unknown / state-management / etc.]
-**Issue:** [Description of the problem]
-**Impact:** [Why this matters]
-**Fix:**
-```arkts
-// Corrected code
-```
+**Evidence:** [关键代码片段引用（原样引用，不改写）]
+**Impact:** [Why this matters — 用户可感知的功能后果]
 
 ## High Priority 🟠
-
-### 1. [Issue Title]
-...
+### 1. [Issue Title] ...（同上格式）
 
 ## Medium Priority 🟡
 ...
@@ -1163,8 +1208,55 @@ entry/src/main/
 - 🟠 HIGH: N
 - 🟡 MEDIUM: N
 
-**Recommendation:** [Overall assessment and next steps]
+## Checklist（诊断阶段自检）
+- [ ] 未输出任何代码修复块（Fix 内容属于阶段二）
+- [ ] 每条问题有文件:行号证据与影响分析
+- [ ] 问题按"用户可感知影响"定级，未引用语法规则名作定级依据
 ```
+
+### 阶段二：修复规划报告（以确认的问题清单为输入）
+
+```markdown
+## Planning Input
+[阶段一问题清单版本/日期；声明本报告不引入清单之外的新问题]
+
+## Fix DSL Entries
+### Fix_H4: [一句话标题]
+Target: [对应问题 ID + 目标]
+Severity: HIGH
+Approach: [具体方案；被否决时保留并标注"已否决"]
+Preconditions:
+  - Module: ...
+Postconditions:
+  - State: ...
+Side_Effects:
+  - Dependency: ...
+Conflicts_With:
+  - Fix_H6: [原因]
+Resolution: [改 Approach / 调顺序 / 互斥交决策]
+
+（每个修复一个 DSL 条目）
+
+## Fix Dependency Graph
+[文本或 Mermaid：depends on / conflicts with / alternative to 边]
+
+## Batches（依赖拓扑序）
+| Batch | Fix IDs | 理由 |
+|-------|---------|------|
+| 1 | Fix_H9, Fix_M2 | 无前置依赖 |
+| 2 | Fix_H4 | 依赖 H9 接口产出 |
+| 3 | Fix_H6 | 冲突已消解，依赖新接口/事件 |
+
+## Checklist（规划阶段自检）
+- [ ] 所有修复填写了 DSL（Approach/Preconditions/Postconditions/Side_Effects）
+- [ ] Side_Effects 与未解决修复的 Target/Postconditions 冲突均已显式列出 + Resolution
+- [ ] 批次顺序符合依赖拓扑（depends on 在前）
+- [ ] 未引入问题清单之外的新问题
+
+**Recommendation:** [总体建议：先合并/先重审项，批次的合并顺序与验收标准]
+```
+
+> **轻度审查（<3 修复且互不触及同一目标）**：可合并为单报告，但报告末尾仍需 Fix Dependency Graph 一节声明"无冲突"（所有 Side_Effects 无交集），并保留两阶段的自检清单。
 
 ## Quick Reference
 

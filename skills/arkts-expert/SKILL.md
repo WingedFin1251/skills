@@ -57,10 +57,13 @@ Before any review, determine the target HarmonyOS API version:
 
 ## Development Process
 
-### Two-Stage Deep Review (v2.0 — MANDATORY)
+### Two-Stage Deep Review (v2.1 — MANDATORY)
 Execute **Stage 1 → Stage 2** in order. Stage 1 consumes 70% of your attention
 budget on single-file, single-function logic. Stage 2 consumes 30% on
 cross-file architecture and migration patterns.
+
+**Report output is two-phase (v2.1):** Diagnosis report (issues only, no fix
+code) → user confirms → Planning report (fix DSL + dependency graph + batches).
 
 ---
 
@@ -127,7 +130,7 @@ Check naming and project structure. See AGENTS.md §8.
 
 ---
 
-## Attention Budget Guide (v2.0 — MANDATORY)
+## Attention Budget Guide (v2.1 — MANDATORY)
 
 This section defines how to allocate your limited context attention.
 
@@ -146,7 +149,7 @@ This section defines how to allocate your limited context attention.
 - Output: "⚠️ API version undetected. Applying all V1+V2 rules. Manual verification of target API version recommended."
 - Apply the broadest rule set when uncertain.
 
-**Skipped File Rules (v2.0 — MANDATORY):**
+**Skipped File Rules (v2.1 — MANDATORY):**
 - **Skipped != Passed**: If a file was not scanned due to size or context limits,
   you MUST NOT conclude the code is safe in that file. You had a blind spot.
 - **Contextual Awareness**:
@@ -166,6 +169,7 @@ This section defines how to allocate your limited context attention.
 | **2** | 🟠 HIGH | Android Migration | Concept mapping, native module chain |
 | **2** | 🟠 HIGH | Service Layer | Cross-method matrix, upstream contract (AGENTS.md §9) |
 | **2** | 🟠 HIGH | Platform Runtime | BusinessError code, destroy, @Sendable, dependency direction (AGENTS.md §10) |
+| **2** | ⚙️ MANDATORY | Fix Coordination | ≥3 fixes or shared targets: two-phase report, fix DSL, dependency graph (AGENTS.md §11) |
 | **2** | 🟡 MEDIUM | Code Style | Naming, project structure |
 
 ## Bundled Resources
@@ -177,10 +181,15 @@ This section defines how to allocate your limited context attention.
 - **references/performance.md** — Optimization patterns and profiling; load for performance issues
 - **references/android-migration.md** — Android ↔ HarmonyOS mapping; load for migration issues
 - **references/service-layer.md** — Service-layer / structural audit flow (cross-method matrix, platform-runtime checklist); load for non-UI classes (wrapper/service/Worker)
+- **references/fix-planning.md** — Fix coordination spec: two-phase (diagnosis→planning), fix DSL (Preconditions/Postconditions/Side_Effects/Conflicts_With), Fix Dependency Graph, batching; load when ≥3 fixes or fixes share a target
 - **scripts/arkts-lint.sh** — ArkTS static analysis wrapper (Bash)
 - **scripts/arkts-lint.ps1** — ArkTS static analysis wrapper (PowerShell)
 
 ## Code Review Output Format
+
+**两阶段产出（v2.1 — MANDATORY）**：诊断与规划分离——先发布阶段一，用户确认问题清单后，再发布阶段二。≥3 个修复或修复触及同一目标时，启用修复协调流程（AGENTS.md §11 + references/fix-planning.md）。
+
+### 阶段一：问题诊断报告（仅列问题，禁止修复代码）
 
 Reports MUST start with a project detection block:
 
@@ -193,13 +202,21 @@ Reports MUST start with a project detection block:
   - Example: "⚠️ 3 ETS files skipped due to context window. Manual review recommended."
   - If none skipped: "All project files scanned successfully."
 
-### 2. Summary
+### 2. Summary（仅描述，不含修复建议）
 ### 3. Critical Issues 🔴
 ### 4. High Priority 🟠
 ### 5. Medium Priority 🟡
+   - 每条含 **Evidence**（原样代码引用）与 **Impact**（用户可感知影响）；**不含 Fix 代码块**
 ### 6. Android Migration Notes (if applicable)
 ### 7. Service-Layer / Structural Notes (if applicable — 封装类/服务类/Worker 才输出)
    - 关注点矩阵结论（哪列勾选不齐）、异常可达性（死分支）、平台能力验证门结论
    - 输入不足（缺契约/平台知识）→ 标注"无法评估"
+
+### 阶段二：修复规划报告（用户确认问题清单后产出）
+- **Planning Input**：声明基于阶段一清单 vX，不引入新问题
+- **Fix DSL Entries**：每个修复填 Fix_ID/Target/Severity/Approach/Preconditions/Postconditions/Side_Effects/Conflicts_With/Resolution
+- **Fix Dependency Graph**：文本或 Mermaid，显式标 `depends on` / `conflicts with` / `alternative to` 边
+- **Batches**：按依赖拓扑分批（Batch 1 无前置依赖…）
+- **Checklist**：规划阶段自检清单（见 AGENTS.md §11）
 
 See AGENTS.md for the full report template.
