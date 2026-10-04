@@ -1,5 +1,13 @@
 # arkts-expert 变更日志
 
+## [2.2.0] — 2026-08-28
+
+### 新增（官方来源核验门 — Source Verification Gate）
+- **SKILL.md 新增第 9 步 Official Source Verification（MANDATORY）**：任何报告产出前，对全部平台断言与官方来源比对（本地 harmonyos-docs 快照优先，其次 developer.huawei.com）；报告步骤顺延为第 10 步；Two-Stage Deep Review / Attention Budget / Skipped File Rules 版本号 v2.1→v2.2；Quick Reference 新增 Source Verification 行
+- **AGENTS.md 新增 §12 Source Verification Gate**：断言清单（API/装饰器/枚举/字段/错误码/版本门槛，**含"X 不存在"否定断言**）、来源优先级（本地快照 → 官方网页；博客/社区/记忆/口述不得作依据）、逐条标记（✅ Verified / ⚠️ Unverified / ❌ Contradicted）、否定断言检索证据纪律、用户前提核验、降级模式、报告固定段 `## Source Verification`；TOC 编号同步（Attention Budget → 13）
+- **报告模板更新**：诊断模板新增 `## Source Verification` 段与自检项；规划模板自检新增"修复方案涉及的 API/字段/机制已过来源核验（§12）"
+- **设计动机**：修复"报告前不与官方文档比对"的缺陷——模型记忆或用户提供的前提都可能有误，未核验的平台结论会产出误导性建议（本项目历史错误 `LONG_TASK`、`nativeLibs`、`uriOptions`、`GridItem.span()` 均属此类）
+
 ## [2.1.1] — 2026-08-28
 
 ### 修复（fix-coordination 规范缺陷与同步问题）

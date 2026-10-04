@@ -57,12 +57,17 @@ Before any review, determine the target HarmonyOS API version:
 
 ## Development Process
 
-### Two-Stage Deep Review (v2.1 — MANDATORY)
+### Two-Stage Deep Review (v2.2 — MANDATORY)
 Execute **Stage 1 → Stage 2** in order. Stage 1 consumes 70% of your attention
 budget on single-file, single-function logic. Stage 2 consumes 30% on
 cross-file architecture and migration patterns.
 
-**Report output is two-phase (v2.1):** Diagnosis report (issues only, no fix
+**Before ANY report output (diagnosis or planning):** run **Step 9 — Official
+Source Verification**. Every platform claim (including "X 不存在" negative
+claims and user-provided premises) must be checked against official docs.
+Unverified claims are flagged "待官方确认" and must not be stated as fact.
+
+**Report output is two-phase (v2.2):** Diagnosis report (issues only, no fix
 code) → user confirms → Planning report (fix DSL + dependency graph + batches).
 
 ---
@@ -126,11 +131,36 @@ Check for Android concept leakage. See AGENTS.md §7.
 ### 8. **Style & Structure Review** (🟡 MEDIUM)
 Check naming and project structure. See AGENTS.md §8.
 
-### 9. **Generate Report** using the template in AGENTS.md
+### 9. **Official Source Verification**（官方来源核验门 — MANDATORY）
+
+**Must run before writing ANY report (diagnosis and planning alike).** The
+model's memory and the user's premises are NOT evidence — official docs are.
+
+1. **Claim inventory** — extract every platform assertion from your findings:
+   API / 装饰器 / 枚举值 / 配置字段 / 生命周期回调 / 错误码 / 版本门槛 /
+   参数类型与行为 / 官方推荐与否，以及**"X 不存在"这类否定断言**。
+2. **Sources (priority order)** — ① 本地官方文档快照（`harmonyos-docs` 技能：
+   按该技能自身指引**动态定位**技能根目录，禁止硬编码路径；走
+   QUICK_INDEX → 子索引 → 文档 两步检索后取证）；② developer.huawei.com 官方
+   文档（ArkTS 检索工具或网页）。博客/社区/记忆/口述只能作线索，不能作依据。
+3. **Verdict per claim** — ✅ Verified（附证据 `文件:行` 或 URL）/
+   ⚠️ Unverified（标注"待官方确认"并降级或删除）/
+   ❌ Contradicted（与官方冲突 → 必须改正或撤回后再出报告）。
+4. **Negative claims** — "不存在 / 不支持 / 已废弃"必须记录检索证据
+   （检索范围 + 关键词 + 结果）；无检索证据不得断言不存在。
+5. **User premises** — 用户提供的说法同样纳入核验；不成立时在报告中直接
+   指出，不得顺着错误前提给建议。
+6. **Degradation** — 无官方源可用 → 报告顶部声明"⚠️ 未做官方来源核验"，
+   且禁止输出确定性平台结论（仅保留代码本身可证实的发现）。
+
+**Output:** a `## Source Verification` section in every report (verified claims +
+sources; unverified items listed separately). Full rule: AGENTS.md §12.
+
+### 10. **Generate Report** using the template in AGENTS.md
 
 ---
 
-## Attention Budget Guide (v2.1 — MANDATORY)
+## Attention Budget Guide (v2.2 — MANDATORY)
 
 This section defines how to allocate your limited context attention.
 
@@ -149,7 +179,7 @@ This section defines how to allocate your limited context attention.
 - Output: "⚠️ API version undetected. Applying all V1+V2 rules. Manual verification of target API version recommended."
 - Apply the broadest rule set when uncertain.
 
-**Skipped File Rules (v2.1 — MANDATORY):**
+**Skipped File Rules (v2.2 — MANDATORY):**
 - **Skipped != Passed**: If a file was not scanned due to size or context limits,
   you MUST NOT conclude the code is safe in that file. You had a blind spot.
 - **Contextual Awareness**:
@@ -170,6 +200,7 @@ This section defines how to allocate your limited context attention.
 | **2** | 🟠 HIGH | Service Layer | Cross-method matrix, upstream contract (AGENTS.md §9) |
 | **2** | 🟠 HIGH | Platform Runtime | BusinessError code, destroy, @Sendable, dependency direction (AGENTS.md §10) |
 | **2** | ⚙️ MANDATORY | Fix Coordination | ≥3 fixes or shared targets: two-phase report, fix DSL, dependency graph (AGENTS.md §11) |
+| **2** | ⚙️ MANDATORY | Source Verification | Pre-report gate: verify every platform claim vs official docs; ⚠️/❌ handling (AGENTS.md §12, Step 9) |
 | **2** | 🟡 MEDIUM | Code Style | Naming, project structure |
 
 ## Bundled Resources
@@ -187,7 +218,7 @@ This section defines how to allocate your limited context attention.
 
 ## Code Review Output Format
 
-**两阶段产出（v2.1 — MANDATORY）**：诊断与规划分离。**交付模式**：默认单稿内分区输出（问题清单 → 修复规划，规划标注"待确认后实施"）；用户明确要求先诊断、或影响面大（≥5 修复/跨模块重构）时分两轮交付。≥3 个修复或修复触及同一目标时，启用修复协调流程（AGENTS.md §11 + references/fix-planning.md）。
+**两阶段产出（v2.2 — MANDATORY）**：诊断与规划分离。**交付模式**：默认单稿内分区输出（问题清单 → 修复规划，规划标注"待确认后实施"）；用户明确要求先诊断、或影响面大（≥5 修复/跨模块重构）时分两轮交付。≥3 个修复或修复触及同一目标时，启用修复协调流程（AGENTS.md §11 + references/fix-planning.md）。**任何报告产出前**必须完成第 9 步官方来源核验（AGENTS.md §12），并在报告中输出 `## Source Verification` 段。
 
 ### 阶段一：问题诊断报告（仅列问题，禁止修复代码）
 

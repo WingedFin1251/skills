@@ -55,8 +55,8 @@ Run the lint script on this file
 
 ```
 arkts-expert/
-├── SKILL.md                    # 入口：触发条件 + Rule 0 + 9 步工作流
-│                               # Entry: triggers + Rule 0 + 9-step workflow
+├── SKILL.md                    # 入口：触发条件 + Rule 0 + 10 步工作流（含来源核验门）
+│                               # Entry: triggers + Rule 0 + 10-step workflow (incl. source-verification gate)
 ├── AGENTS.md                   # 完整规则参考：10 维度 × ❌/✅ 示例
 │                               # Full rule reference: 10 dimensions × ❌/✅ examples
 ├── references/
@@ -109,9 +109,9 @@ Automatically identifies target API version (API 9 / 10-11 / 12+) and adjusts st
 
 ## 工作流程 / Workflow
 
-当技能触发时，AI 依次执行 9 步工作流；**Stage 2 按文件角色分叉**：被审对象为封装类/服务类/Worker 类时，导航/性能/迁移检查（Step 5-8）替换为服务层审查流（维度 9/10，见 references/service-layer.md）。**报告两阶段产出（v2.1）**：诊断（问题清单，无修复代码）→ 规划（修复 DSL + 依赖图 + 分批）；≥3 个修复或共享目标时启用修复协调（references/fix-planning.md）。
+当技能触发时，AI 依次执行 10 步工作流；**Stage 2 按文件角色分叉**：被审对象为封装类/服务类/Worker 类时，导航/性能/迁移检查（Step 5-8）替换为服务层审查流（维度 9/10，见 references/service-layer.md）。**报告两阶段产出（v2.2）**：诊断（问题清单，无修复代码）→ 规划（修复 DSL + 依赖图 + 分批）；≥3 个修复或共享目标时启用修复协调（references/fix-planning.md）。**任何报告产出前**先执行第 9 步官方来源核验（AGENTS.md §12），报告中输出 `## Source Verification` 段。
 
-When the skill triggers, the AI executes a 9-step workflow; **Stage 2 branches by file role**: for wrapper/service/Worker classes, checks 5-8 are replaced by the Service-Layer Audit flow (dimensions 9-10, see references/service-layer.md). **Two-phase reporting (v2.1)**: Diagnosis (issues only) → Planning (fix DSL + dependency graph + batches); fix coordination activates at ≥3 fixes or shared targets (references/fix-planning.md).
+When the skill triggers, the AI executes a 10-step workflow; **Stage 2 branches by file role**: for wrapper/service/Worker classes, checks 5-8 are replaced by the Service-Layer Audit flow (dimensions 9-10, see references/service-layer.md). **Two-phase reporting (v2.2)**: Diagnosis (issues only) → Planning (fix DSL + dependency graph + batches); fix coordination activates at ≥3 fixes or shared targets (references/fix-planning.md). **Before any report**, Step 9 verifies all platform claims against official docs (AGENTS.md §12) and emits a `## Source Verification` section.
 
 ```
 ╔═══════════════════════════════════════════╗
@@ -140,8 +140,13 @@ When the skill triggers, the AI executes a 9-step workflow; **Stage 2 branches b
 ╚═══════════════════════════════════════════╝
                       ↓
 ╔═══════════════════════════════════════════╗
-║  Step 9: 代码风格 + 生成报告              ║  🟡 MEDIUM
-║  命名、结构、报告模板                     ║
+║  Step 9: 官方来源核验 / Source Verify     ║  ⚙️ MANDATORY
+║  平台断言 vs 官方文档（本地快照/官网）    ║
+╚═══════════════════════════════════════════╝
+                      ↓
+╔═══════════════════════════════════════════╗
+║  Step 10: 生成报告 / Generate Report      ║  ⚙️ MANDATORY
+║  诊断/规划两阶段 + Source Verification 段 ║
 ╚═══════════════════════════════════════════╝
 ```
 
@@ -206,6 +211,8 @@ Automatically detects: any/unknown usage, non-Error throws, bare new Promise() (
 ---
 
 ### 版本历史 / Version History
+- **v2.2.0** — 官方来源核验门（Source Verification Gate）：任何报告产出前，强制将全部平台断言与官方来源比对（本地 harmonyos-docs 快照优先）；新增未核验标记与否定断言检索纪律；SKILL 第 9 步 + AGENTS.md §12 + 报告固定段 / Source-verification gate: mandatory cross-check of every platform claim against official docs before any report; unverified/contradicted handling; SKILL Step 9 + AGENTS.md §12 + fixed report section
+- **v2.1.1** — 修复协调规范缺陷修正：诊断/规划默认单稿内分区交付（分两轮仅限用户要求或影响面大）；澄清"禁止代码块"= 禁止修复性代码（证据引用合法）；DSL 补 Evidence 字段；Side_Effects 强制结构化枚举；新增 depends-on 环检测与同 Target 重复方案核验规则 / Fix-coordination spec fixes: single-doc two-phase default delivery, evidence-vs-fix-code clarification, DSL Evidence field, structured Side_Effects, cycle & duplicate-plan verification rules
 - **v2.1** — 修复协调三层约束：Fix Dependency Graph + 诊断/规划分离 + 修复 DSL；新增 references/fix-planning.md；AGENTS.md §11；报告两阶段产出 / Fix coordination: dependency graph + diagnosis/planning split + fix DSL; new references/fix-planning.md; AGENTS.md §11; two-phase reports
 - **v2.0** — 维度升级：8 → 10（新增服务层一致性、平台运行时与结构安全）；Stage 2 角色分叉审查流；新增 references/service-layer.md；Two-Stage 流程 v2.0 / Dimension upgrade 8 → 10 (service-layer consistency, platform runtime & structural safety); Stage 2 role-based branching; new references/service-layer.md
 - **v1.0** — 初始版本：8 维度规则体系、5 参考文件、2 工具脚本、Android 迁移映射 / Initial release: 8-dimension rule system, 5 reference files, 2 tool scripts, Android migration mapping

@@ -31,7 +31,8 @@
 8. [Code Style & Organization](#8-code-style--organization)
 
 ### Review Process — **MANDATORY**
-12. [Attention Budget Guide](#attention-budget-guide-v20--mandatory)
+12. [Source Verification Gate](#12-source-verification-gate官方来源核验门--mandatory)
+13. [Attention Budget Guide](#attention-budget-guide-v20--mandatory)
 
 ---
 
@@ -1178,9 +1179,54 @@ entry/src/main/
 
 详细规范（DSL 模板/图格式/分批示例/检查清单）见 `references/fix-planning.md`。
 
+## 12. Source Verification Gate（官方来源核验门 — MANDATORY）
+
+**Impact: MANDATORY | Category: source-verification | Tags:** official-docs, evidence, anti-hallucination
+
+### Why This Matters
+审查结论若无官方来源支撑，就可能把"模型记忆"或"用户给错的前提"当成事实输出——**错误建议比没有建议更糟**。本门在任何报告产出前，强制把所有平台断言与官方来源比对一次；它同时防住两类失效：模型幻觉（凭记忆断言平台能力）与前提污染（顺着用户错误说法给建议）。
+
+### 12.1 需要核验的断言（Claim Inventory）
+- API / 模块 / 导入路径是否存在——**含"X 不存在"的否定断言**
+- 装饰器 / 枚举值 / 配置字段 / 生命周期回调 / 错误码 / 属性与方法名
+- 版本门槛（"从 API N 开始支持"）、废弃状态（deprecated / 不推荐）
+- 官方推荐与否、参数类型与运行时行为
+
+> 代码逻辑类结论（如"该 catch 分支不可达"）由**代码证据**支撑，不属本门范围；但只要结论里出现"平台**不会 / 不支持 / 必须**…"，就落入本门。
+
+### 12.2 来源优先级
+1. **本地官方文档快照**（`harmonyos-docs` 技能）：按该技能自身指引**动态定位**技能根目录（禁止硬编码绝对路径），走 `QUICK_INDEX → 子索引 → 文档` 两步检索，取 `文件:行` 证据
+2. **developer.huawei.com 官方文档**：ArkTS 检索工具或网页抓取，记录 URL
+3. 博客 / 社区 / 模型记忆 / 用户口述：**只能作线索，不能作依据**
+
+### 12.3 逐条核验标记
+| 标记 | 含义 | 报告处理 |
+|---|---|---|
+| ✅ Verified | 官方来源已证实（附 `文件:行` 或 URL） | 可作确定性结论 |
+| ⚠️ Unverified | 无来源或来源不足 | 标注"待官方确认"，并降级或删除该建议 |
+| ❌ Contradicted | 与官方文档冲突 | **必须改正或撤回**，禁止进入报告 |
+
+### 12.4 否定断言纪律
+"X 不存在 / 不支持 / 已废弃"必须记录**检索证据**：检索范围（哪个分区/Kit）+ 关键词 + 结果（0 命中或反证）。无检索证据不得断言不存在——本项目历史上最危险的错误（`LONG_TASK`、`nativeLibs`、`uriOptions`、`GridItem.span()`）全部属于这类断言。
+
+### 12.5 用户前提核验
+用户提供的说法（"官方推荐 X""必须用 Y""这个 API 已废弃"）与代码中的假设同属核验对象；不成立时在报告中**明确指出**，不得顺势给建议。
+
+### 12.6 降级模式
+无任何官方来源可用（离线且无本地快照）→ 报告顶部声明"⚠️ 未做官方来源核验"，禁止输出确定性平台结论；仅保留可由代码本身证明的发现。
+
+### 12.7 输出格式（每份报告的固定段落）
+```markdown
+## Source Verification
+- ✅ <claim> — 来源: <file:line | URL>
+- ⚠️ <claim> — 未核验，标注"待官方确认"
+- ❌ <claim> — 与官方冲突：<官方原文>，已改正/撤回
+- 检索记录（否定断言）: <scope> + <keyword> → <result>
+```
+
 ## Code Review Report Format
 
-**报告采用两阶段产出（v2.1 — MANDATORY）**：诊断与规划**分区/分轮交付**——默认单稿内分区（先问题清单、后修复规划，规划节标注"待确认后实施"）；用户明确要求先诊断或影响面大（≥5 修复/跨模块重构）时分两轮。≥3 修复或共享目标时启用修复协调（§11）。
+**报告采用两阶段产出（v2.1 — MANDATORY）**：诊断与规划**分区/分轮交付**——默认单稿内分区（先问题清单、后修复规划，规划节标注"待确认后实施"）；用户明确要求先诊断或影响面大（≥5 修复/跨模块重构）时分两轮。≥3 修复或共享目标时启用修复协调（§11）。**出报告前必须先完成 §12 来源核验门（SKILL.md 第 9 步）**，报告中必须包含 `## Source Verification` 段。
 
 ### 阶段一：问题诊断报告（禁止代码修复方案）
 
@@ -1210,10 +1256,15 @@ entry/src/main/
 - 🟠 HIGH: N
 - 🟡 MEDIUM: N
 
+## Source Verification
+[§12 输出：已核验平台断言＋来源（file:line 或 URL）；未核验项单列并标注"待官方确认"；
+ 否定断言的检索记录（范围＋关键词＋结果）]
+
 ## Checklist（诊断阶段自检）
 - [ ] 未输出任何代码修复块（Fix 内容属于阶段二）
 - [ ] 每条问题有文件:行号证据与影响分析
 - [ ] 问题按"用户可感知影响"定级，未引用语法规则名作定级依据
+- [ ] 所有平台断言已过官方来源核验（§12）；未核验项已标注"待官方确认"
 ```
 
 ### 阶段二：修复规划报告（以确认的问题清单为输入）
@@ -1254,6 +1305,7 @@ Resolution: [改 Approach / 调顺序 / 互斥交决策]
 - [ ] Side_Effects 与未解决修复的 Target/Postconditions 冲突均已显式列出 + Resolution
 - [ ] 批次顺序符合依赖拓扑（depends on 在前）
 - [ ] 未引入问题清单之外的新问题
+- [ ] 修复方案涉及的 API/字段/机制已过官方来源核验（§12）
 
 **Recommendation:** [总体建议：先合并/先重审项，批次的合并顺序与验收标准]
 ```
